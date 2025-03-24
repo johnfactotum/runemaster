@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+    <id>io.github.johnfactotum.Runemaster</id>
+    <metadata_license>CC0-1.0</metadata_license>
+    <project_license>GPL-3.0-or-later</project_license>
+    <name>Runemaster</name>
+    <summary>Unleash the magic of Unicode characters</summary>
+    <description>
+        <ul>
+            <li>Browse Unicode characters, by block or script, color coded by general category.</li>
+            <li>See details for each character, including cross references, comments, HTML entities, and compose key sequences.</li>
+            <li>Compose and edit text in the scratchpad. Apply normalization, change casing, and see the code point breakdown.</li>
+        </ul>
+    </description>
+    <launchable type="desktop-id">io.github.johnfactotum.Runemaster.desktop</launchable>
+    <developer id="io.github.johnfactotum">
+        <name>John Factotum</name>
+    </developer>
+    <branding>
+        <color type="primary" scheme_preference="light">#d0ba9a</color>
+        <color type="primary" scheme_preference="dark">#5f4d38</color>
+    </branding>
+    <url type="homepage">https://github.com/johnfactotum/runemaster</url>
+    <url type="vcs-browser">https://github.com/johnfactotum/runemaster</url>
+    <url type="bugtracker">https://github.com/johnfactotum/runemaster/issues</url>
+    <url type="donation">https://www.buymeacoffee.com/johnfactotum</url>
+    <screenshots>
+        <screenshot type="default">
+            <image type="source">https://raw.githubusercontent.com/johnfactotum/runemaster/97fecf4954a71a6ae3c81e1d744636fb0995d7f7/screenshot.png</image>
+        </screenshot>
+    </screenshots>
+    <releases>
+    </releases>
+    <content_rating type="oars-1.1" />
+</component>
