@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Runemaster
+GenericName=Character Viewer
+Categories=Utility;
+Exec=runemaster
+Icon=io.github.johnfactotum.Runemaster
+Terminal=false
+Type=Application
+StartupNotify=true
