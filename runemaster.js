@@ -978,6 +978,81 @@ const AppWindow = GObject.registerClass({
                 actionName: 'win.scratchpad-copy',
             }),
         )
+    #columns = {
+        code: new Gtk.ColumnViewColumn({
+            title: 'Code',
+            factory: new Gtk.SignalListItemFactory()
+                .$.connect('setup', (_, listItem) => {
+                    listItem.child = new Gtk.Label({ xalign: 1 })
+                        .$.add_css_class('monospace')
+                        .$.add_css_class('dim-label')
+                })
+                .$.connect('bind', (_, listItem) => {
+                    const item = listItem.item
+                    listItem.child.label =  formatHex(item.code)
+                }),
+        }),
+        char: new Gtk.ColumnViewColumn({
+            title: 'Char',
+            factory: new Gtk.SignalListItemFactory()
+                .$.connect('setup', (_, listItem) => {
+                    listItem.child = new Gtk.Inscription({ xalign: .5 })
+                })
+                .$.connect('bind', (_, listItem) => {
+                    const item = listItem.item
+                    listItem.child.text = String.fromCodePoint(item.code)
+                }),
+        }),
+        name: new Gtk.ColumnViewColumn({
+            title: 'Name',
+            expand: true,
+            factory: new Gtk.SignalListItemFactory()
+                .$.connect('setup', (_, listItem) => {
+                    listItem.child = new Gtk.Label({
+                        xalign: 0,
+                        ellipsize: Pango.EllipsizeMode.MIDDLE,
+                    })
+                })
+                .$.connect('bind', (_, listItem) => {
+                    const item = listItem.item
+                    const name = item.name
+                    listItem.child.label = name
+                    listItem.child.tooltipText = name
+                }),
+        }),
+        block: new Gtk.ColumnViewColumn({
+            title: 'Block',
+            expand: true,
+            factory: new Gtk.SignalListItemFactory()
+                .$.connect('setup', (_, listItem) => {
+                    listItem.child = new Gtk.Label({
+                        xalign: 0,
+                        ellipsize: Pango.EllipsizeMode.MIDDLE,
+                    })
+                })
+                .$.connect('bind', (_, listItem) => {
+                    const item = listItem.item
+                    const name = item.block
+                    listItem.child.label = name
+                    listItem.child.tooltipText = name
+                }),
+        }),
+        category: new Gtk.ColumnViewColumn({
+            title: 'Cat',
+            factory: new Gtk.SignalListItemFactory()
+                .$.connect('setup', (_, listItem) => {
+                    listItem.child = new Gtk.Label({
+                        valign: Gtk.Align.CENTER,
+                    }).$.add_css_class('category-label')
+                })
+                .$.connect('bind', (_, listItem) => {
+                    const item = listItem.item
+                    listItem.child.label = item.category
+                    listItem.child.tooltipText = GC.get(item.category)
+                    setCharCategory(listItem.child, item.category)
+                }),
+        }),
+    }
     #columnView = new Gtk.ColumnView({
         singleClickActivate: true,
         model: new Gtk.NoSelection({
@@ -989,80 +1064,11 @@ const AppWindow = GObject.registerClass({
             this.openChars('block', item.block, item.code)
         })
         .$$.append_column(
-            new Gtk.ColumnViewColumn({
-                title: 'Code',
-                factory: new Gtk.SignalListItemFactory()
-                    .$.connect('setup', (_, listItem) => {
-                        listItem.child = new Gtk.Label({ xalign: 1 })
-                            .$.add_css_class('monospace')
-                            .$.add_css_class('dim-label')
-                    })
-                    .$.connect('bind', (_, listItem) => {
-                        const item = listItem.item
-                        listItem.child.label =  formatHex(item.code)
-                    }),
-            }),
-            new Gtk.ColumnViewColumn({
-                title: 'Char',
-                factory: new Gtk.SignalListItemFactory()
-                    .$.connect('setup', (_, listItem) => {
-                        listItem.child = new Gtk.Inscription({ xalign: .5 })
-                    })
-                    .$.connect('bind', (_, listItem) => {
-                        const item = listItem.item
-                        listItem.child.text = String.fromCodePoint(item.code)
-                    }),
-            }),
-            new Gtk.ColumnViewColumn({
-                title: 'Name',
-                expand: true,
-                factory: new Gtk.SignalListItemFactory()
-                    .$.connect('setup', (_, listItem) => {
-                        listItem.child = new Gtk.Label({
-                            xalign: 0,
-                            ellipsize: Pango.EllipsizeMode.MIDDLE,
-                        })
-                    })
-                    .$.connect('bind', (_, listItem) => {
-                        const item = listItem.item
-                        const name = item.name
-                        listItem.child.label = name
-                        listItem.child.tooltipText = name
-                    }),
-            }),
-            new Gtk.ColumnViewColumn({
-                title: 'Block',
-                expand: true,
-                factory: new Gtk.SignalListItemFactory()
-                    .$.connect('setup', (_, listItem) => {
-                        listItem.child = new Gtk.Label({
-                            xalign: 0,
-                            ellipsize: Pango.EllipsizeMode.MIDDLE,
-                        })
-                    })
-                    .$.connect('bind', (_, listItem) => {
-                        const item = listItem.item
-                        const name = item.block
-                        listItem.child.label = name
-                        listItem.child.tooltipText = name
-                    }),
-            }),
-            new Gtk.ColumnViewColumn({
-                title: 'Cat',
-                factory: new Gtk.SignalListItemFactory()
-                    .$.connect('setup', (_, listItem) => {
-                        listItem.child = new Gtk.Label({
-                            valign: Gtk.Align.CENTER,
-                        }).$.add_css_class('category-label')
-                    })
-                    .$.connect('bind', (_, listItem) => {
-                        const item = listItem.item
-                        listItem.child.label = item.category
-                        listItem.child.tooltipText = GC.get(item.category)
-                        setCharCategory(listItem.child, item.category)
-                    }),
-            }),
-        )
+            this.#columns.code,
+            this.#columns.char,
+            this.#columns.name,
+            this.#columns.block,
+            this.#columns.category)
     #bindings = new WeakMap()
     #tabView = new Adw.TabView()
         .$.connect('close-page', (tabView, page) => {
@@ -1265,7 +1271,6 @@ const AppWindow = GObject.registerClass({
             .$.add_top_bar(new Adw.TabBar({ autohide: false, view: this.#tabView }))
 
         const scratchpad = new Adw.OverlaySplitView({
-            heightRequest: 250,
             sidebarWidthFraction: .6,
             maxSidebarWidth: 1000,
             sidebarPosition: Gtk.PackType.END,
@@ -1288,6 +1293,26 @@ const AppWindow = GObject.registerClass({
                     action: Gtk.NamedAction.new('win.scratchpad-clear'),
                     trigger: Gtk.ShortcutTrigger.parse_string('<ctrl>u'),
                 })))
+
+        const scratchPadBin = new Adw.BreakpointBin({
+            child: scratchpad,
+            heightRequest: 250,
+            widthRequest: 360,
+        }).$.add_breakpoint(new Adw.Breakpoint({
+            condition: Adw.BreakpointCondition.parse('max-width: 700px'),
+        }).$.connect('apply', () => {
+            scratchpad.add_css_class('narrow')
+            this.#columnView.$$.remove_column(
+                this.#columns.code, this.#columns.block)
+        }).$.connect('unapply', () => {
+            scratchpad.remove_css_class('narrow')
+            this.#columnView.$$.insert_column(
+                [0, this.#columns.code],
+                [1, this.#columns.char],
+                [2, this.#columns.name],
+                [3, this.#columns.block],
+                [4, this.#columns.category])
+        }))
 
         const charsSplitView = new Adw.OverlaySplitView({
             sidebarWidthFraction: .2,
@@ -1315,7 +1340,7 @@ const AppWindow = GObject.registerClass({
                 .$.append(new Gtk.Revealer({
                     child: new Gtk.Box({
                         orientation: Gtk.Orientation.VERTICAL,
-                    }).$$.append(new Gtk.Separator(), scratchpad),
+                    }).$$.append(new Gtk.Separator(), scratchPadBin),
                     vexpand: false,
                     transitionType: Gtk.RevealerTransitionType.SLIDE_UP,
                 }).$.bind_property('reveal-child', this.#scratchpadButton, 'active',
@@ -1472,6 +1497,12 @@ app
 }
 .scratchpad .sidebar-pane {
     background: var(--window-bg-color);
+}
+.scratchpad.narrow {
+    font-size: smaller;
+}
+.scratchpad.narrow textview {
+    font-size: 15pt;
 }
 
 gridview {
