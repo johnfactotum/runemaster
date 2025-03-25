@@ -541,8 +541,8 @@ const CharInfo = GObject.registerClass({
         this.#font.label = layout.get_unknown_glyphs_count() > 0 ? '' : layout
             .get_line(0)?.runs[0]?.item?.analysis?.font.describe()?.get_family() ?? ''
     }
-    showCodepoint(code) {
-        const obj = getCode(code)
+    load(obj) {
+        const { code } = obj
         const char = String.fromCodePoint(code)
         this.#char.text = char
         this.#updateFontInfo()
@@ -620,11 +620,23 @@ const CharsView = GObject.registerClass({
     #factory = new Gtk.SignalListItemFactory()
     #factoryBindings = new WeakMap()
     #selection = new Gtk.SingleSelection({ model: this.#list })
+    #breakpoint = new Adw.Breakpoint({
+        condition: Adw.BreakpointCondition.parse('max-width: 500px'),
+    })
     #gridView = new Gtk.GridView({
         tabBehavior: Gtk.ListTabBehavior.ITEM,
         maxColumns: 16,
         model: this.#selection,
         factory: this.#factory,
+    })
+    #bottomBarOffset = new Adw.Bin()
+    #bottomBarOffsetBinding
+    #bottomBarCode = new Gtk.Label()
+        .$$.add_css_class('monospace', 'dim-label', 'caption')
+    #bottomBarName = new Gtk.Label({
+        hexpand: true,
+        xalign: 0,
+        ellipsize: Pango.EllipsizeMode.MIDDLE,
     })
     #charInfo = new CharInfo()
     #copyShortcut = new Gtk.Shortcut({
@@ -633,20 +645,75 @@ const CharsView = GObject.registerClass({
     })
     constructor(params) {
         super(params)
-        this.child = new Adw.OverlaySplitView({
-            sidebarWidthFraction: .5,
-            sidebarPosition: Gtk.PackType.END,
-            maxSidebarWidth: 300,
-            content: new Gtk.ScrolledWindow({
-                child: this.#gridView,
-                hexpand: true,
-                vexpand: true,
-            }),
-            sidebar: new Gtk.ScrolledWindow({ child: this.#charInfo }),
+
+        const bottomSheet = new Adw.BottomSheet({
+            content: new Gtk.Box({
+                orientation: Gtk.Orientation.VERTICAL,
+            }).$$.append(
+                new Adw.LayoutSlot({ id: 'grid' }),
+                this.#bottomBarOffset),
+            bottomBar: new Gtk.Box({
+                spacing: 9,
+                marginStart: 12,
+                marginEnd: 12,
+                marginTop: 12,
+                marginBottom: 12,
+            })
+                .$$.append(this.#bottomBarCode, this.#bottomBarName)
+                .$.append(new Gtk.Image({
+                    iconName: 'pan-up-symbolic',
+                })),
+            sheet: new Adw.ToolbarView({
+                content: new Gtk.ScrolledWindow({
+                    propagateNaturalHeight: true,
+                    child: new Adw.LayoutSlot({ id: 'info' }),
+                }),
+            }).$.add_top_bar(new Adw.HeaderBar()),
         })
+        this.#bottomBarOffsetBinding = bottomSheet.bind_property(
+            'bottom-bar-height', this.#bottomBarOffset, 'height-request',
+            GObject.BindingFlags.SYNC_CREATE)
+
+        this.child = new Adw.BreakpointBin({
+            heightRequest: 150,
+            widthRequest: 360,
+        })
+            .$.add_breakpoint(this.#breakpoint)
+            .$.set_child(new Adw.MultiLayoutView()
+                .$.add_layout(new Adw.Layout({
+                    name: 'wide',
+                    content: new Adw.OverlaySplitView({
+                        sidebarWidthFraction: .5,
+                        sidebarPosition: Gtk.PackType.END,
+                        maxSidebarWidth: 300,
+                        content: new Adw.LayoutSlot({ id: 'grid' }),
+                        sidebar: new Gtk.ScrolledWindow({
+                            child: new Adw.LayoutSlot({ id: 'info' }),
+                        }),
+                    }),
+                }))
+                .$.add_layout(new Adw.Layout({
+                    name: 'narrow',
+                    content: bottomSheet,
+                }))
+                .$.set_child('grid', new Gtk.ScrolledWindow({
+                    child: this.#gridView,
+                    hexpand: true,
+                    vexpand: true,
+                }))
+                .$.set_child('info', this.#charInfo))
+
         this.add_controller(new Gtk.ShortcutController()
             .$.add_shortcut(this.#copyShortcut))
 
+        this.#connections.set(this.#breakpoint, [
+            this.#breakpoint.connect('apply', () => {
+                this.child.child.set_layout_name('narrow')
+            }),
+            this.#breakpoint.connect('unapply', () => {
+                this.child.child.set_layout_name('wide')
+            }),
+        ])
         this.#connections.set(this.#gridView, [
             this.#gridView.connect('activate', (view, i) => {
                 const code = view.model.get_item(i).code
@@ -706,6 +773,7 @@ const CharsView = GObject.registerClass({
         this.showCodeInfo()
     }
     destroy() {
+        this.#bottomBarOffsetBinding.unbind()
         for (const obj of [this.#gridView, this.#selection, this.#factory])
             for (const connection of this.#connections.get(obj))
                 obj.disconnect(connection)
@@ -724,7 +792,11 @@ const CharsView = GObject.registerClass({
             }
     }
     showCodeInfo() {
-        this.#charInfo.showCodepoint(this.selectedCode)
+        const code = this.selectedCode
+        const obj = getCode(code)
+        this.#bottomBarCode.label = formatHex(code)
+        this.#bottomBarName.label = obj.name
+        this.#charInfo.load(obj)
     }
     setFamily(family) {
         this.#charInfo.setFamily(family)
@@ -1231,7 +1303,7 @@ const AppWindow = GObject.registerClass({
                 orientation: Gtk.Orientation.VERTICAL,
             }).$.append(new Adw.BreakpointBin({
                 child: charsSplitView,
-                heightRequest: 150,
+                heightRequest: 300,
                 widthRequest: 360,
             }).$.add_breakpoint(new Adw.Breakpoint({
                 condition: Adw.BreakpointCondition.parse('max-width: 800px'),
