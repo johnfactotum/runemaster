@@ -1099,6 +1099,7 @@ const AppWindow = GObject.registerClass({
             return true
         })
     openChars(type, name, code, data = null) {
+        this.#bottomSheet.open = false
         const tabView = this.#tabView
         for (let i = 0; i < tabView.nPages; i++) {
             const page = tabView.get_nth_page(i)
