@@ -1204,6 +1204,7 @@ const AppWindow = GObject.registerClass({
             const page = this.#tabView.get_nth_page(i)
             page.child.setFamily(family)
         }
+        this.#bottomSheetCharInfo.setFamily(family)
     })
     constructor(params) {
         super(params)
@@ -1214,6 +1215,8 @@ const AppWindow = GObject.registerClass({
                 page.child.destroy()
             }
         })
+
+        this.#bottomSheetCharInfo.setFamily(this.#fontButton.family)
 
         this.#textView.extraMenu = new Gio.Menu()
             .$.append_section(null, new Gio.Menu()
