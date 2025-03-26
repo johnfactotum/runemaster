@@ -440,7 +440,7 @@ const CharInfo = GObject.registerClass({
     Properties: makeParams({
         'title': 'string',
     }),
-}, class extends Gtk.Box {
+}, class extends Adw.Bin {
     #char = new Char({
         drawGuidelines: true,
         minLine: true,
@@ -457,6 +457,12 @@ const CharInfo = GObject.registerClass({
         wrap: true,
         selectable: true,
     })
+    #shortName = new Gtk.Label({
+        xalign: .5,
+        selectable: true,
+        justify: Gtk.Justification.CENTER,
+        ellipsize: Pango.EllipsizeMode.MIDDLE,
+    })
     #block = makeProp()
     #font = makeProp()
     #category = makeProp()
@@ -470,14 +476,25 @@ const CharInfo = GObject.registerClass({
     #utf16 = makeProp().$.add_css_class('monospace')
     #crossRef = new CharsFlowBox()
     #copyButton = new Gtk.Button({
+        valign: Gtk.Align.CENTER,
         iconName: 'edit-copy-symbolic',
         tooltipText: 'Copy',
         actionName: 'win.copy',
+        actionTarget: GLib.Variant.new_string(''),
     })
     #insertButton = new Gtk.Button({
+        valign: Gtk.Align.CENTER,
         iconName: 'insert-text-symbolic',
         tooltipText: 'Insert',
         actionName: 'win.scratchpad-insert',
+        actionTarget: GLib.Variant.new_string(''),
+    })
+    #infoButton = new Gtk.Button({
+        valign: Gtk.Align.CENTER,
+        iconName: 'help-about-symbolic',
+        tooltipText: 'Info',
+        actionName: 'win.show-char-info',
+        actionTarget: GLib.Variant.new_uint32(0),
     })
     #gridItems = [
         [makeHeading('Font'), this.#font],
@@ -494,40 +511,67 @@ const CharInfo = GObject.registerClass({
         [makeHeading('UTF-16'), this.#utf16],
         [makeHeading('Compose'), this.#compose],
     ]
+    #grid = new Gtk.Grid({
+        columnSpacing: 12,
+        rowSpacing: 6,
+    })
     constructor(params) {
         super(params)
-        this.orientation = Gtk.Orientation.VERTICAL
-        const grid = new Gtk.Grid({
-            columnSpacing: 12,
-            rowSpacing: 6,
-        })
-        this.append(new Gtk.Box({
-            orientation: Gtk.Orientation.VERTICAL,
-            spacing: 6,
-            marginStart: 18,
-            marginEnd: 18,
-            marginTop: 12,
-            marginBottom: 18,
-        }).$$.append(
-            this.#char,
-            this.#code,
-            this.#name,
-            new Gtk.Box({
-                halign: Gtk.Align.CENTER,
-                spacing: 6,
-                marginTop: 6,
-                marginBottom: 12,
-            }).$$.append(this.#copyButton, this.#insertButton),
-            grid))
+        this.child = new Adw.MultiLayoutView()
+            .$.add_layout(new Adw.Layout({
+                name: 'tall',
+                content: new Gtk.Box({
+                    orientation: Gtk.Orientation.VERTICAL,
+                    spacing: 6,
+                    marginStart: 18,
+                    marginEnd: 18,
+                    marginTop: 12,
+                    marginBottom: 18,
+                }).$$.append(
+                    this.#char,
+                    new Adw.LayoutSlot({ id: 'code' }),
+                    this.#name,
+                    new Gtk.Box({
+                        halign: Gtk.Align.CENTER,
+                        spacing: 6,
+                        marginTop: 6,
+                        marginBottom: 12,
+                    })
+                        .$.append(new Adw.LayoutSlot({ id: 'copy-button' }))
+                        .$.append(this.#insertButton),
+                    this.#grid),
+            }))
+            .$.add_layout(new Adw.Layout({
+                name: 'short',
+                content: new Gtk.ActionBar()
+                    .$.set_center_widget(new Gtk.Box({
+                        orientation: Gtk.Orientation.VERTICAL,
+                    }).$$.append(
+                        new Adw.LayoutSlot({ id: 'code' }),
+                        this.#shortName))
+                    .$.pack_start(this.#infoButton)
+                    .$.pack_end(new Adw.LayoutSlot({ id: 'copy-button' })),
+            }))
+            .$$.set_child(
+                ['code', this.#code],
+                ['copy-button', this.#copyButton],
+            )
 
         this.#gridItems.forEach((a, i) => Array.isArray(a)
-            ? a.forEach((b, j) => grid.attach(b, j, i, 1, 1))
-            : grid.attach(a, 0, i, 2, 1))
+            ? a.forEach((b, j) => this.#grid.attach(b, j, i, 1, 1))
+            : this.#grid.attach(a, 0, i, 2, 1))
 
         this.#commentConnection = this.#comment.connect('activate-link', (_, link) => {
             this.root.showCodepoint(parseInt(link.split('#')[1], 16))
             return true
         })
+    }
+    setLayout(layout) {
+        if (layout === 'short') this.child.set_layout_name('short')
+        else {
+            this.child.set_layout_name('tall')
+            this.root.closeBottomSheet()
+        }
     }
     setFamily(family) {
         this.#fontDesc.set_family(family)
@@ -541,8 +585,8 @@ const CharInfo = GObject.registerClass({
         this.#font.label = layout.get_unknown_glyphs_count() > 0 ? '' : layout
             .get_line(0)?.runs[0]?.item?.analysis?.font.describe()?.get_family() ?? ''
     }
-    load(obj) {
-        const { code } = obj
+    showCodepoint(code) {
+        const obj = getCode(code)
         const char = String.fromCodePoint(code)
         this.#char.text = char
         this.#updateFontInfo()
@@ -550,11 +594,13 @@ const CharInfo = GObject.registerClass({
         const charVar = GLib.Variant.new_string(char)
         this.#copyButton.set_action_target_value(charVar)
         this.#insertButton.set_action_target_value(charVar)
+        this.#infoButton.set_action_target_value(GLib.Variant.new_uint32(code))
 
         this.#code.label = `U+${formatHex(code)}`
         this.#name.label = obj.originalName !== obj.name
             ? `${obj.originalName}\n${obj.originalName === '<control>' ? '' : '※'}${obj.name}`
             : obj.name
+        this.#shortName.label = obj.name
         this.#block.label = obj.block
         this.#category.label = GC.get(obj.category)
         this.#script.label = obj.script.join(', ') || 'Unknown'
@@ -629,15 +675,6 @@ const CharsView = GObject.registerClass({
         model: this.#selection,
         factory: this.#factory,
     })
-    #bottomBarOffset = new Adw.Bin()
-    #bottomBarOffsetBinding
-    #bottomBarCode = new Gtk.Label()
-        .$$.add_css_class('monospace', 'dim-label', 'caption')
-    #bottomBarName = new Gtk.Label({
-        hexpand: true,
-        xalign: 0,
-        ellipsize: Pango.EllipsizeMode.MIDDLE,
-    })
     #charInfo = new CharInfo()
     #copyShortcut = new Gtk.Shortcut({
         action: Gtk.NamedAction.new('win.copy'),
@@ -645,35 +682,6 @@ const CharsView = GObject.registerClass({
     })
     constructor(params) {
         super(params)
-
-        const bottomSheet = new Adw.BottomSheet({
-            content: new Gtk.Box({
-                orientation: Gtk.Orientation.VERTICAL,
-            }).$$.append(
-                new Adw.LayoutSlot({ id: 'grid' }),
-                this.#bottomBarOffset),
-            bottomBar: new Gtk.Box({
-                spacing: 9,
-                marginStart: 12,
-                marginEnd: 12,
-                marginTop: 12,
-                marginBottom: 12,
-            })
-                .$$.append(this.#bottomBarCode, this.#bottomBarName)
-                .$.append(new Gtk.Image({
-                    iconName: 'pan-up-symbolic',
-                })),
-            sheet: new Adw.ToolbarView({
-                content: new Gtk.ScrolledWindow({
-                    propagateNaturalHeight: true,
-                    child: new Adw.LayoutSlot({ id: 'info' }),
-                }),
-            }).$.add_top_bar(new Adw.HeaderBar()),
-        })
-        this.#bottomBarOffsetBinding = bottomSheet.bind_property(
-            'bottom-bar-height', this.#bottomBarOffset, 'height-request',
-            GObject.BindingFlags.SYNC_CREATE)
-
         this.child = new Adw.BreakpointBin({
             heightRequest: 150,
             widthRequest: 360,
@@ -694,7 +702,11 @@ const CharsView = GObject.registerClass({
                 }))
                 .$.add_layout(new Adw.Layout({
                     name: 'narrow',
-                    content: bottomSheet,
+                    content: new Gtk.Box({
+                        orientation: Gtk.Orientation.VERTICAL,
+                    }).$$.append(
+                        new Adw.LayoutSlot({ id: 'grid' }),
+                        new Adw.LayoutSlot({ id: 'info' })),
                 }))
                 .$.set_child('grid', new Gtk.ScrolledWindow({
                     child: this.#gridView,
@@ -708,9 +720,11 @@ const CharsView = GObject.registerClass({
 
         this.#connections.set(this.#breakpoint, [
             this.#breakpoint.connect('apply', () => {
+                this.#charInfo.setLayout('short')
                 this.child.child.set_layout_name('narrow')
             }),
             this.#breakpoint.connect('unapply', () => {
+                this.#charInfo.setLayout('tall')
                 this.child.child.set_layout_name('wide')
             }),
         ])
@@ -773,7 +787,6 @@ const CharsView = GObject.registerClass({
         this.showCodeInfo()
     }
     destroy() {
-        this.#bottomBarOffsetBinding.unbind()
         for (const obj of [this.#gridView, this.#selection, this.#factory])
             for (const connection of this.#connections.get(obj))
                 obj.disconnect(connection)
@@ -792,11 +805,7 @@ const CharsView = GObject.registerClass({
             }
     }
     showCodeInfo() {
-        const code = this.selectedCode
-        const obj = getCode(code)
-        this.#bottomBarCode.label = formatHex(code)
-        this.#bottomBarName.label = obj.name
-        this.#charInfo.load(obj)
+        this.#charInfo.showCodepoint(this.selectedCode)
     }
     setFamily(family) {
         this.#charInfo.setFamily(family)
@@ -936,6 +945,18 @@ const AppWindow = GObject.registerClass({
         'font-fallback': 'boolean',
     }),
 }, class extends Adw.ApplicationWindow {
+    #bottomSheetCharInfo = new CharInfo()
+    #bottomSheet = new Adw.BottomSheet({
+        sheet: new Adw.ToolbarView({
+            content: new Gtk.ScrolledWindow({
+                propagateNaturalHeight: true,
+                child: this.#bottomSheetCharInfo,
+            }),
+        }).$.add_top_bar(new Adw.HeaderBar()),
+    })
+    closeBottomSheet() {
+        this.#bottomSheet.open = false
+    }
     #charsList = new Gio.ListStore()
     #textView = new Gtk.TextView({
         wrapMode: Gtk.WrapMode.WORD,
@@ -1324,7 +1345,7 @@ const AppWindow = GObject.registerClass({
                 GObject.BindingFlags.BIDIRECTIONAL | GObject.BindingFlags.SYNC_CREATE)
 
         this.content = new Adw.ToastOverlay({
-            child: new Gtk.Box({
+            child: this.#bottomSheet.$.set_content(new Gtk.Box({
                 orientation: Gtk.Orientation.VERTICAL,
             }).$.append(new Adw.BreakpointBin({
                 child: charsSplitView,
@@ -1344,7 +1365,7 @@ const AppWindow = GObject.registerClass({
                     vexpand: false,
                     transitionType: Gtk.RevealerTransitionType.SLIDE_UP,
                 }).$.bind_property('reveal-child', this.#scratchpadButton, 'active',
-                    GObject.BindingFlags.BIDIRECTIONAL | GObject.BindingFlags.SYNC_CREATE)),
+                    GObject.BindingFlags.BIDIRECTIONAL | GObject.BindingFlags.SYNC_CREATE))),
         })
 
         const styleManager = Adw.StyleManager.get_default()
@@ -1381,6 +1402,13 @@ const AppWindow = GObject.registerClass({
                 this.#searchEntry.grab_focus()
             }),
             new Gio.SimpleAction({
+                name: 'show-char-info',
+                parameterType: new GLib.VariantType('u'),
+            }).$.connect('activate', (_, param) => {
+                this.#bottomSheetCharInfo.showCodepoint(param.unpack())
+                this.#bottomSheet.open = true
+            }),
+            new Gio.SimpleAction({
                 name: 'scratchpad-insert',
                 parameterType: new GLib.VariantType('s'),
             }).$.connect('activate', (_, param) => {
@@ -1390,6 +1418,7 @@ const AppWindow = GObject.registerClass({
                     .$.delete(start, end)
                     .$.insert(start, param.unpack(), -1)
                     .$.end_user_action()
+                this.#bottomSheet.open = false
                 this.#scratchpadButton.active = true
             }),
             new Gio.SimpleAction({ name: 'scratchpad-copy' }).$.connect('activate', () => {
