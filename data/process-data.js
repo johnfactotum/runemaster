@@ -1,13 +1,15 @@
-#!/usr/bin/env -S deno run --allow-read --allow-write
+#!/usr/bin/env node
+import * as fs from 'node:fs/promises'
+const readFile = path => fs.readFile(path, { encoding: 'utf8' })
 
 const ucdPath = path => `./ucd/${path}`
 const composePath = './Compose'
 
-const UnicodeData = await Deno.readTextFile(ucdPath('UnicodeData.txt'))
-const Blocks = await Deno.readTextFile(ucdPath('Blocks.txt'))
-const Scripts = await Deno.readTextFile(ucdPath('Scripts.txt'))
-const ScriptExtensions = await Deno.readTextFile(ucdPath('ScriptExtensions.txt'))
-const PropertyValueAliases = await Deno.readTextFile(ucdPath('PropertyValueAliases.txt'))
+const UnicodeData = await readFile(ucdPath('UnicodeData.txt'))
+const Blocks = await readFile(ucdPath('Blocks.txt'))
+const Scripts = await readFile(ucdPath('Scripts.txt'))
+const ScriptExtensions = await readFile(ucdPath('ScriptExtensions.txt'))
+const PropertyValueAliases = await readFile(ucdPath('PropertyValueAliases.txt'))
 
 const parse = str => str
     .split('\n')
@@ -79,7 +81,7 @@ const scripts = Array.from(Map.groupBy(ucd.Scripts
 })
 
 
-const NamesList = await Deno.readTextFile(ucdPath('NamesList.txt'))
+const NamesList = await readFile(ucdPath('NamesList.txt'))
 
 const match = (state, map) => str => {
     for (const [regex, f] of map) {
@@ -114,7 +116,7 @@ const namesList = state.map.map(([code, obj]) => {
 }).filter(x => x)
 
 const compose = new Map()
-for (const line of (await Deno.readTextFile(composePath)).split('\n')) {
+for (const line of (await readFile(composePath)).split('\n')) {
     const l = line.split('#')[0]
     const char = l.match(/"(\S+)"/)?.[1]
     if (!char) continue
@@ -136,5 +138,5 @@ const output = {
     compose: Array.from(compose),
 }
 
-await Deno.writeTextFile('./data.json', JSON.stringify(output))
+await fs.writeFile('./data.json', JSON.stringify(output))
 

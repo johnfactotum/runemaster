@@ -5,7 +5,6 @@ export default [js.configs.recommended, {
     languageOptions: {
         globals: {
             ...globals.browser,
-            Deno: 'readonly',
         },
     },
     linterOptions: {
