@@ -539,11 +539,11 @@ const CharInfo = GObject.registerClass({
         [makeHeading('Script'), this.#script],
         [makeHeading('Alias'), this.#alias],
         [makeHeading('Comment'), this.#comment],
-        [makeHeading('See Also').$.set_valign(Gtk.Align.START).$.set_margin_top(3),
-            this.#crossRef],
         [makeHeading('Radical'), this.#radical],
         [makeHeading('Readings'), this.#readings],
         [makeHeading('Meaning'), this.#definition],
+        [makeHeading('See Also').$.set_valign(Gtk.Align.START).$.set_margin_top(3),
+            this.#crossRef],
         new Gtk.Separator({ marginTop: 9 }).$.add_css_class('spacer'),
         [makeHeading('HTML'), this.#html],
         [makeHeading('UTF-8'), this.#utf8],
@@ -692,8 +692,15 @@ const CharInfo = GObject.registerClass({
         this.#utf16.label = char.split('')
             .map(x => `0x${formatHex(x.charCodeAt(0))}`).join(' ')
 
-        this.#crossRef.load(namesList.get(code)?.['x']
-            ?.map(code => makeGObject({ code })) ?? [])
+        this.#crossRef.load([]
+            .concat(namesList.get(code)?.['x'] ?? [])
+            .concat(!han ? []
+            : [...new Set(Array.from([
+                'kZVariant', 'kSimplifiedVariant', 'kTraditionalVariant',
+                'kSemanticVariant', 'kSpecializedSemanticVariant']
+                .map(x => han[x]).join(' ').matchAll(/U\+([0-9A-F]{4,6})/g) ?? [],
+            ([, x]) => parseInt(x, 16)).filter(x => x !== code))])
+            .map(code => makeGObject({ code })))
 
         for (const row of this.#gridItems) {
             if (!Array.isArray(row)) continue
