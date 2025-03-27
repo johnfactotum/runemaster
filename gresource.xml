@@ -3,5 +3,6 @@
   <gresource prefix="/io/github/johnfactotum/Runemaster">
     <file>data/data.json</file>
     <file>data/entities.json</file>
+    <file>data/unihan.json</file>
   </gresource>
 </gresources>

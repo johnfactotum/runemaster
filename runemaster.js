@@ -10,7 +10,7 @@ import Adw from 'gi://Adw?version=1'
 import Gdk from 'gi://Gdk'
 import Pango from 'gi://Pango'
 import Graphene from 'gi://Graphene'
-import { programInvocationName, programArgs }  from 'system'
+import { programInvocationName, programArgs, exit }  from 'system'
 import { setConsoleLogDomain } from 'console'
 
 /* utils */
@@ -96,6 +96,18 @@ const makeParams = obj => Object.fromEntries(Object.entries(obj).map(([k, v]) =>
 const makeGObject = obj => Object.assign(new GObject.Object(), obj)
 
 const esc = x => GLib.markup_escape_text(x, -1)
+
+const memoize = f => {
+    const memory = new Map()
+    return obj => {
+        if (memory.has(obj)) return memory.get(obj)
+        else {
+            const result = f(obj)
+            memory.set(obj, result)
+            return result
+        }
+    }
+}
 
 /* Unicode data */
 
@@ -193,6 +205,25 @@ const setCharCategory = (widget, cat) => {
 }
 
 const compose = new Map(data.compose)
+
+const unihan = memoize(() => readData('data/unihan.json').then(json => {
+    const map = new Map(json.map)
+    return {
+        get: key => {
+            const data = map.get(key)
+            if (!data) return null
+            return Object.fromEntries(Array.from(Object.entries(data),
+                ([k, v]) => [json.props[k], v]))
+        },
+    }
+}))
+
+const cangjieKeys = new Map([
+    ['A','日'],['B','月'],['C','金'],['D','木'],['E','水'],['F','火'],['G','土'],
+    ['H','竹'],['I','戈'],['J','十'],['K','大'],['L','中'],['M','一'],['N','弓'],
+    ['O','人'],['P','心'],['Q','手'],['R','口'],['S','尸'],['T','廿'],['U','山'],
+    ['V','女'],['W','田'],['Y','卜'],['X','難'],['Z','重'],
+])
 
 /* widgets */
 
@@ -441,6 +472,7 @@ const CharInfo = GObject.registerClass({
         'title': 'string',
     }),
 }, class extends Adw.Bin {
+    #destroyed = false
     #char = new Char({
         drawGuidelines: true,
         minLine: true,
@@ -475,6 +507,10 @@ const CharInfo = GObject.registerClass({
     #utf8 = makeProp().$.add_css_class('monospace')
     #utf16 = makeProp().$.add_css_class('monospace')
     #crossRef = new CharsFlowBox()
+    #radical = makeProp()
+    #readings = makeProp()
+    #definition = makeProp()
+    #cangjie = makeProp()
     #copyButton = new Gtk.Button({
         valign: Gtk.Align.CENTER,
         iconName: 'edit-copy-symbolic',
@@ -505,11 +541,15 @@ const CharInfo = GObject.registerClass({
         [makeHeading('Comment'), this.#comment],
         [makeHeading('See Also').$.set_valign(Gtk.Align.START).$.set_margin_top(3),
             this.#crossRef],
+        [makeHeading('Radical'), this.#radical],
+        [makeHeading('Readings'), this.#readings],
+        [makeHeading('Meaning'), this.#definition],
         new Gtk.Separator({ marginTop: 9 }).$.add_css_class('spacer'),
         [makeHeading('HTML'), this.#html],
         [makeHeading('UTF-8'), this.#utf8],
         [makeHeading('UTF-16'), this.#utf16],
         [makeHeading('Compose'), this.#compose],
+        [makeHeading('Cangjie'), this.#cangjie],
     ]
     #grid = new Gtk.Grid({
         columnSpacing: 12,
@@ -585,9 +625,23 @@ const CharInfo = GObject.registerClass({
         this.#font.label = layout.get_unknown_glyphs_count() > 0 ? '' : layout
             .get_line(0)?.runs[0]?.item?.analysis?.font.describe()?.get_family() ?? ''
     }
-    showCodepoint(code) {
+    async showCodepoint(code) {
         const obj = getCode(code)
         const char = String.fromCodePoint(code)
+
+        const han = /\p{Script=Han}/u.test(char) ? (await unihan()).get(code) : null
+        if (this.#destroyed) return
+        const radical = han?.kRSUnicode?.split('.')
+        this.#radical.label = !radical ? ''
+            : `${String.fromCodePoint(0x2f00 + parseInt(radical[0]) - 1)} + ${radical[1]}`
+        this.#readings.label = !han ? ''
+            : ['kMandarin', 'kCantonese', 'kJapanese', 'kHangul']
+                .map(x => han[x]?.replaceAll(/\s/g, ', ')).filter(x => x).join(' / ')
+                .replaceAll(/:[01ENX]{1,3}/g, '')
+        this.#definition.label = han?.kDefinition ?? ''
+        this.#cangjie.label = !han?.kCangjie ? ''
+            : `${Array.from(han.kCangjie, x => cangjieKeys.get(x)).join('')} (${han.kCangjie})`
+
         this.#char.text = char
         this.#updateFontInfo()
 
@@ -647,6 +701,7 @@ const CharInfo = GObject.registerClass({
         }
     }
     destroy() {
+        this.#destroyed = true
         this.#comment.disconnect(this.#commentConnection)
         this.#crossRef.destroy()
     }
@@ -806,6 +861,7 @@ const CharsView = GObject.registerClass({
     }
     showCodeInfo() {
         this.#charInfo.showCodepoint(this.selectedCode)
+            .catch(e => console.log(e))
     }
     setFamily(family) {
         this.#charInfo.setFamily(family)
@@ -1410,6 +1466,7 @@ const AppWindow = GObject.registerClass({
                 parameterType: new GLib.VariantType('u'),
             }).$.connect('activate', (_, param) => {
                 this.#bottomSheetCharInfo.showCodepoint(param.unpack())
+                    .catch(e => console.log(e))
                 this.#bottomSheet.open = true
             }),
             new Gio.SimpleAction({
@@ -1627,4 +1684,5 @@ textview {
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(),
             provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
     })
-    .run([programInvocationName, ...programArgs])
+
+exit(await app.runAsync([programInvocationName, ...programArgs]))
