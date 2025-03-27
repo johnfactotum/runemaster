@@ -109,6 +109,19 @@ const memoize = f => {
     }
 }
 
+const settings = name => {
+    const schema = pkg.id + (name ? '.' + name : '')
+    try { return new Gio.Settings({ schema }) } catch {}
+}
+
+const bindSettings = (name, target, arr) => {
+    const s = settings(name)
+    if (!s) return
+    for (const prop of arr)
+        s.bind(prop, target, prop, Gio.SettingsBindFlags.DEFAULT)
+    return s
+}
+
 /* Unicode data */
 
 const readData = async path => JSON.parse(new TextDecoder().decode(
@@ -1271,6 +1284,8 @@ const AppWindow = GObject.registerClass({
     })
     constructor(params) {
         super(params)
+
+        bindSettings('window', this, ['default-width', 'default-height', 'maximized'])
 
         this.connect('close-request', () => {
             for (let i = 0; i < this.#tabView.nPages; i++) {

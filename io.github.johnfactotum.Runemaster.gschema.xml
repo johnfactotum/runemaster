@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+    <schema id="io.github.johnfactotum.Runemaster.window" path="/io/github/johnfactotum/Runemaster/window/">
+        <key name="default-width" type="i">
+            <default>960</default>
+        </key>
+        <key name="default-height" type="i">
+            <default>650</default>
+        </key>
+        <key name="maximized" type="b">
+            <default>false</default>
+        </key>
+    </schema>
+</schemalist>

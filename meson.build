@@ -42,6 +42,10 @@ install_data('io.github.johnfactotum.Runemaster.svg',
     install_dir: iconsdir / 'hicolor' / 'scalable' / 'apps'
 )
 
+install_data('io.github.johnfactotum.Runemaster.gschema.xml',
+    install_dir: schemadir
+)
+
 pkgdatadir = join_paths(get_option('datadir'), meson.project_name())
 
 gnome.compile_resources(
@@ -53,6 +57,7 @@ gnome.compile_resources(
 )
 
 gnome.post_install(
+    glib_compile_schemas: true,
     gtk_update_icon_cache: true,
     update_desktop_database: true,
 )
