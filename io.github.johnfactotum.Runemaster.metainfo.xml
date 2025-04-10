@@ -26,10 +26,24 @@
     <url type="donation">https://www.buymeacoffee.com/johnfactotum</url>
     <screenshots>
         <screenshot type="default">
-            <image type="source">https://raw.githubusercontent.com/johnfactotum/runemaster/97fecf4954a71a6ae3c81e1d744636fb0995d7f7/screenshot.png</image>
+            <image>https://raw.githubusercontent.com/johnfactotum/runemaster/97fecf4954a71a6ae3c81e1d744636fb0995d7f7/screenshot.png</image>
+            <caption>Browsing characters and inspecting text</caption>
+        </screenshot>
+        <screenshot>
+            <image>https://raw.githubusercontent.com/johnfactotum/runemaster/0aa6f22220bd47b1e9fb71f60ee2a03863b47f34/screenshot-han.png</image>
+            <caption>Viewing Unihan data</caption>
+        </screenshot>
+        <screenshot>
+            <image>https://raw.githubusercontent.com/johnfactotum/runemaster/0aa6f22220bd47b1e9fb71f60ee2a03863b47f34/screenshot-search.png</image>
+            <caption>Finding character by name</caption>
         </screenshot>
     </screenshots>
     <releases>
+        <release version="1.0.0" date="2025-04-10">
+            <description>
+                <p>Initial release</p>
+            </description>
+        </release>
     </releases>
     <content_rating type="oars-1.1" />
 </component>
