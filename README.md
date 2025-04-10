@@ -4,6 +4,10 @@
 
 *Runemaster* is a character viewer app made for GNOME.
 
+<a href="https://flathub.org/apps/io.github.johnfactotum.Runemaster">
+    <img height="50" alt="Get it on Flathub" src="https://flathub.org/api/badge?locale=en">
+</a>
+
 <img src="screenshot.png" alt="Screenshot">
 
 ## Features
@@ -24,7 +28,6 @@ The following dependencies are required for building:
 
 - `meson (>= 0.59)`
 - `pkg-config`
-- `gettext`
 
 To install, run the following commands:
 
