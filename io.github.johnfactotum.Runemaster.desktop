@@ -1,6 +1,8 @@
 [Desktop Entry]
 Name=Runemaster
 GenericName=Character Viewer
+Comment=Unleash the magic of Unicode characters
+Keywords=characters;unicode;symbols;font;
 Categories=Utility;
 Exec=runemaster
 Icon=io.github.johnfactotum.Runemaster
