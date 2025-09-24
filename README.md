@@ -21,7 +21,7 @@
 Dependencies:
 
 - `gjs`
-- `gtk4`
+- `gtk4 (>= 4.20)`
 - `libadwaita (>= 1.7)`
 
 The following dependencies are required for building:

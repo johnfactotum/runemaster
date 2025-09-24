@@ -1450,14 +1450,6 @@ const AppWindow = GObject.registerClass({
                     GObject.BindingFlags.BIDIRECTIONAL | GObject.BindingFlags.SYNC_CREATE))),
         })
 
-        const styleManager = Adw.StyleManager.get_default()
-        if (styleManager.dark) this.add_css_class('dark')
-        const handler = styleManager.connect('notify::dark', ({ dark }) => {
-            if (dark) this.add_css_class('dark')
-            else this.remove_css_class('dark')
-        })
-        this.connect('destroy', () => styleManager.disconnect(handler))
-
         this.$$.add_action(
             Gio.PropertyAction.new('font-fallback', this, 'font-fallback'),
             new Gio.SimpleAction({ name: 'close-tab' }).$.connect('activate', () => {
@@ -1600,7 +1592,16 @@ app
         title: pkg.name,
     })).present())
     .$.connect('startup', () => {
-        const provider = new Gtk.CssProvider().$.load_from_string(`
+        const provider = new Gtk.CssProvider().$.load_from_string(stylesheet)
+        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(),
+            provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        const updateProvider = ({ dark }) => provider.prefersColorScheme = dark
+            ? Gtk.InterfaceColorScheme.DARK : Gtk.InterfaceColorScheme.LIGHT
+        updateProvider(Adw.StyleManager.get_default()
+            .$.connect('notify::dark', updateProvider))
+    })
+
+const stylesheet = `
 .scratchpad columnview {
     background: none;
 }
@@ -1671,40 +1672,37 @@ textview {
 .Cc, .Cf, .Cs, .Co { background: hsl(30, 80%, 90%); color: #000; }
 .Cn { background: hsl(0, 0%, 65%); color: #fff; }
 
-.dark .Lu { background: hsl(0, 0%, 22%); color: #fff; }
-.dark .Lt { background: hsl(0, 0%, 19%); color: #fff; }
-.dark .Lm { background: hsl(0, 0%, 16%); color: #fff; }
-.dark .Ll, .dark .Lo { background: var(--view-bg-color); color: #fff; }
+@media (prefers-color-scheme: dark) {
+    .Lu { background: hsl(0, 0%, 22%); color: #fff; }
+    .Lt { background: hsl(0, 0%, 19%); color: #fff; }
+    .Lm { background: hsl(0, 0%, 16%); color: #fff; }
+    .Ll, .Lo { background: var(--view-bg-color); color: #fff; }
 
-.dark .Me { background: hsl(0, 35%, 30%); color: #fff; }
-.dark .Mc { background: hsl(0, 35%, 25%); color: #fff; }
-.dark .Mn { background: hsl(0, 35%, 20%); color: #fff; }
+    .Me { background: hsl(0, 35%, 30%); color: #fff; }
+    .Mc { background: hsl(0, 35%, 25%); color: #fff; }
+    .Mn { background: hsl(0, 35%, 20%); color: #fff; }
 
-.dark .Sk { background: hsl(220, 35%, 30%); color: #fff; }
-.dark .Sm, .dark .Sc { background: hsl(220, 35%, 25%); color: #fff; }
-.dark .So { background: hsl(220, 35%, 20%); color: #fff; }
+    .Sk { background: hsl(220, 35%, 30%); color: #fff; }
+    .Sm, .Sc { background: hsl(220, 35%, 25%); color: #fff; }
+    .So { background: hsl(220, 35%, 20%); color: #fff; }
 
-.dark .Nl { background: hsl(100, 35%, 30%); color: #fff; }
-.dark .No { background: hsl(100, 35%, 25%); color: #fff; }
-.dark .Nd { background: hsl(100, 35%, 20%); color: #fff; }
+    .Nl { background: hsl(100, 35%, 30%); color: #fff; }
+    .No { background: hsl(100, 35%, 25%); color: #fff; }
+    .Nd { background: hsl(100, 35%, 20%); color: #fff; }
 
-.dark .Pc, .dark .Pd, .dark .Ps, .dark .Pe, .dark .Pi, .dark .Pf, .dark .Po { background: hsl(250, 35%, 35%); color: #fff; }
-.dark .Zs, .dark .Zl, .dark .Zp { background: hsl(50, 70%, 20%); color: #fff; }
-.dark .Cc, .dark .Cf, .dark .Cs, .dark .Co { background: hsl(30, 70%, 20%); color: #fff; }
-.dark .Cn { background: hsl(0, 0%, 50%); color: #000; }
+    .Pc, .Pd, .Ps, .Pe, .Pi, .Pf, .Po { background: hsl(250, 35%, 35%); color: #fff; }
+    .Zs, .Zl, .Zp { background: hsl(50, 70%, 20%); color: #fff; }
+    .Cc, .Cf, .Cs, .Co { background: hsl(30, 70%, 20%); color: #fff; }
+    .Cn { background: hsl(0, 0%, 50%); color: #000; }
+}
 
 .char-block.Ll, .char-block.Lo,
-.dark .char-block.Ll, .dark .char-block.Lo,
 .no-char-block-color .char-block {
     background: inherit;
     color: inherit;
 }
 
 .no-char-block-color .char-block.Cn { color: transparent; }
-.no-char-block-color .dark .char-block.Cn { color: transparent; }
-    `)
-        Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(),
-            provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-    })
+`
 
 exit(await app.runAsync([programInvocationName, ...programArgs]))
