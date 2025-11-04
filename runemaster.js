@@ -644,9 +644,9 @@ const CharInfo = GObject.registerClass({
 
         const han = /\p{Script=Han}/u.test(char) ? (await unihan()).get(code) : null
         if (this.#destroyed) return
-        const radical = han?.kRSUnicode?.split('.')
-        this.#radical.label = !radical ? ''
-            : `${String.fromCodePoint(0x2f00 + parseInt(radical[0]) - 1)} + ${radical[1]}`
+        const radicals = han?.kRSUnicode?.split(' ')?.map(r => r.split('.'))
+        this.#radical.label = !radicals ? '' : radicals.map(r =>
+            `${String.fromCodePoint(0x2f00 + parseInt(r[0]) - 1)} + ${r[1]}`).join(' / ')
         this.#readings.label = !han ? ''
             : ['kMandarin', 'kCantonese', 'kJapanese', 'kHangul']
                 .map(x => han[x]?.replaceAll(/\s/g, ', ')).filter(x => x).join(' / ')
