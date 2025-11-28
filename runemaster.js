@@ -1351,6 +1351,13 @@ const AppWindow = GObject.registerClass({
                     blockListView.filter(entry.text)
                 })))
 
+        const tabBar = new Adw.TabBar({ autohide: false, view: this.#tabView })
+        const setTabBarLayout = ({ gtkDecorationLayout: layout }) =>
+            tabBar.inverted = layout.indexOf('close') < layout.indexOf(':')
+        setTabBarLayout(Gtk.Settings.get_default().$.connect_object(
+            'notify::gtk-decoration-layout', setTabBarLayout, this,
+            GObject.ConnectFlags.DEFAULT))
+
         const charsPane = new Adw.ToolbarView({
             content: this.#tabView,
             topBarStyle: Adw.ToolbarStyle.RAISED,
@@ -1371,7 +1378,7 @@ const AppWindow = GObject.registerClass({
                 tooltipText: 'Find Character',
                 actionName: 'win.search',
             })))
-            .$.add_top_bar(new Adw.TabBar({ autohide: false, view: this.#tabView }))
+            .$.add_top_bar(tabBar)
 
         const scratchpad = new Adw.OverlaySplitView({
             sidebarWidthFraction: .6,
