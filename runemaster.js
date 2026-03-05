@@ -202,7 +202,7 @@ const searchByName = q => {
     const items = []
     const compare = x => {
         if (!x) return
-        const arr = x.toLowerCase().split(' ')
+        const arr = x.toLowerCase().split(/[ -]/)
         return qs.every(q => arr.includes(q))
     }
     for (const [code, [name]] of map)
