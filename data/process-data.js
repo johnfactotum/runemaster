@@ -10,6 +10,7 @@ const Blocks = await readFile(ucdPath('Blocks.txt'))
 const Scripts = await readFile(ucdPath('Scripts.txt'))
 const ScriptExtensions = await readFile(ucdPath('ScriptExtensions.txt'))
 const PropertyValueAliases = await readFile(ucdPath('PropertyValueAliases.txt'))
+const StandardizedVariants = await readFile(ucdPath('StandardizedVariants.txt'))
 
 const parse = str => str
     .split('\n')
@@ -24,6 +25,7 @@ const ucd = {
     Scripts: parse(Scripts),
     ScriptExtensions: parse(ScriptExtensions),
     PropertyValueAliases: parse(PropertyValueAliases),
+    StandardizedVariants: parse(StandardizedVariants),
 }
 
 const parseHex = x => parseInt(x, 16)
@@ -80,6 +82,12 @@ const scripts = Array.from(Map.groupBy(ucd.Scripts
     return [name, ranges]
 })
 
+const variants = Map.groupBy(
+    ucd.StandardizedVariants.map(([f0, f1]) => [f0.split(' ').map(parseHex), f1]),
+    ([seq]) => seq[0],
+).entries().map(([char, vars]) =>
+    [char, vars]).toArray()
+
 
 const NamesList = await readFile(ucdPath('NamesList.txt'))
 
@@ -134,6 +142,7 @@ const output = {
         gc: getAliases('gc'),
         sc: getAliases('sc'),
     },
+    variants,
     namesList,
     compose: Array.from(compose),
 }

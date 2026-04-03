@@ -135,6 +135,7 @@ const GC = new Map(data.aliases.gc)
 const map = new Map(data.map)
 const namesList = new Map(data.namesList)
 const scripts = new Map(data.scripts)
+const variants = new Map(data.variants)
 const getNameAndCategory = n => map.get(n)
     ?? data.ranges.find(([a, b]) => n >= a && n <= b)?.slice(2)
     ?? ['<Unassigned>', 'Cn']
@@ -248,6 +249,8 @@ const Char = GObject.registerClass({
         'draw-guidelines': 'boolean',
         'min-line': 'boolean',
         'font-fallback': 'boolean',
+        'tooltip-code': 'string',
+        'tooltip-name': 'string',
     }),
 }, class extends Gtk.Widget {
     #fontDesc = new Pango.FontDescription()
@@ -418,11 +421,57 @@ const Char = GObject.registerClass({
         this.layout.set_width(w * Pango.SCALE)
     }
     vfunc_query_tooltip(_, _x, _y, tooltip) {
-        const code = this._text.codePointAt(0)
-        const { name } = getCode(code)
         const font = Adw.StyleManager.get_default().get_monospace_font_name()
-        tooltip.set_markup(`<span font="${font} "alpha="60%">U+${formatHex(code)}</span>\n${esc(name)}`)
+        const code = this._text.codePointAt(0)
+        const desc = esc(this.tooltipName || getCode(code).name)
+        const hex = this.tooltipCode || `U+${formatHex(code)}`
+        tooltip.set_markup(`<span font="${font} "alpha="60%">${hex}</span>\n${desc}`)
         return true
+    }
+})
+
+const VariantsFlowBox = GObject.registerClass({
+    GTypeName: 'RunemasterVariantsFlowBox',
+    Signals: {
+        'selection-changed': { param_types: [GObject.TYPE_OBJECT] },
+    },
+}, class extends Adw.Bin {
+    #flowBox = new Gtk.FlowBox({
+        selectionMode: Gtk.SelectionMode.BROWSE,
+    })
+    #model = new Gio.ListStore()
+    #connection
+    label
+    constructor(params) {
+        super(params)
+        this.child = this.#flowBox
+        this.#flowBox.bind_model(this.#model, item => {
+            const { seq, desc } = item
+            return new Adw.Bin({
+                heightRequest: 40,
+                widthRequest: 40,
+                child: new Char({
+                    text: seq.map(code => String.fromCodePoint(code)).join(''),
+                    fontFallback: true,
+                    tooltipCode: seq.map(code => `U+${formatHex(code)}`).join(' '),
+                    tooltipName: desc,
+                }),
+            }).$.add_css_class('variant-block')
+        })
+        this.#connection = this.#flowBox.connect('selected-children-changed', box => {
+            const children = box.get_selected_children()
+            const item = children[0] ? this.#model.get_item(children[0].get_index()) : null
+            this.emit('selection-changed', item)
+        })
+    }
+    load(arr) {
+        this.label = !!arr.length
+        this.#model.splice(0, this.#model.get_n_items(), arr)
+        if (arr.length)
+            this.#flowBox.select_child(this.#flowBox.get_child_at_index(0))
+    }
+    destroy() {
+        this.#flowBox.disconnect(this.#connection)
     }
 })
 
@@ -496,6 +545,10 @@ const CharInfo = GObject.registerClass({
         xalign: .5,
         selectable: true,
     }).$$.add_css_class('monospace', 'dim-label')
+    #shortCode = new Gtk.Label({
+        xalign: .5,
+        selectable: true,
+    }).$$.add_css_class('monospace', 'dim-label')
     #name = new Gtk.Label({
         xalign: .5,
         justify: Gtk.Justification.CENTER,
@@ -508,6 +561,8 @@ const CharInfo = GObject.registerClass({
         justify: Gtk.Justification.CENTER,
         ellipsize: Pango.EllipsizeMode.MIDDLE,
     })
+    #variants = new VariantsFlowBox()
+    #variantsConnection
     #block = makeProp()
     #font = makeProp()
     #category = makeProp()
@@ -546,6 +601,7 @@ const CharInfo = GObject.registerClass({
         actionTarget: GLib.Variant.new_uint32(0),
     })
     #gridItems = [
+        [makeHeading('Variants').$.set_valign(Gtk.Align.START), this.#variants],
         [makeHeading('Font'), this.#font],
         [makeHeading('Block'), this.#block],
         [makeHeading('Category'), this.#category],
@@ -582,7 +638,7 @@ const CharInfo = GObject.registerClass({
                     marginBottom: 18,
                 }).$$.append(
                     this.#char,
-                    new Adw.LayoutSlot({ id: 'code' }),
+                    this.#code,
                     this.#name,
                     new Gtk.Box({
                         halign: Gtk.Align.CENTER,
@@ -600,13 +656,12 @@ const CharInfo = GObject.registerClass({
                     .$.set_center_widget(new Gtk.Box({
                         orientation: Gtk.Orientation.VERTICAL,
                     }).$$.append(
-                        new Adw.LayoutSlot({ id: 'code' }),
+                        this.#shortCode,
                         this.#shortName))
                     .$.pack_start(this.#infoButton)
                     .$.pack_end(new Adw.LayoutSlot({ id: 'copy-button' })),
             }))
             .$$.set_child(
-                ['code', this.#code],
                 ['copy-button', this.#copyButton],
             )
 
@@ -617,6 +672,17 @@ const CharInfo = GObject.registerClass({
         this.#commentConnection = this.#comment.connect('activate-link', (_, link) => {
             this.root.showCodepoint(parseInt(link.split('#')[1], 16))
             return true
+        })
+        this.#variantsConnection = this.#variants.connect('selection-changed', (_, item) => {
+            if (!item) return
+            const { seq, desc } = item
+            this.#char.text = seq.map(code => String.fromCodePoint(code)).join('')
+            this.#updateFontInfo()
+            this.#code.label = seq.map(code => `U+${formatHex(code)}`).join(' ')
+            this.#name.label = `${this.#shortName.label}${desc ? ` (${desc})` : ''}`
+            const charVar = GLib.Variant.new_string(this.#char.text)
+            this.#copyButton.set_action_target_value(charVar)
+            this.#insertButton.set_action_target_value(charVar)
         })
     }
     setLayout(layout) {
@@ -643,6 +709,11 @@ const CharInfo = GObject.registerClass({
         const obj = getCode(code)
         const char = String.fromCodePoint(code)
 
+        const vars = variants.get(code) ?? []
+        this.#variants.load([]
+            .concat(vars.length ? [[[code], '']] : []).concat(vars)
+            .map(([seq, desc]) => makeGObject({ seq, desc })))
+
         const han = /\p{Script=Han}/u.test(char) ? (await unihan()).get(code) : null
         const radicals = han?.kRSUnicode?.split(' ')?.map(r => r.split('.'))
         this.#radical.label = !radicals ? '' : radicals.map(r =>
@@ -664,6 +735,7 @@ const CharInfo = GObject.registerClass({
         this.#infoButton.set_action_target_value(GLib.Variant.new_uint32(code))
 
         this.#code.label = `U+${formatHex(code)}`
+        this.#shortCode.label = this.#code.label
         this.#name.label = obj.originalName !== obj.name
             ? `${obj.originalName}\n${obj.originalName === '<control>' ? '' : '※'}${obj.name}`
             : obj.name
@@ -723,6 +795,8 @@ const CharInfo = GObject.registerClass({
     destroy() {
         this.#destroyed = true
         this.#comment.disconnect(this.#commentConnection)
+        this.#variants.disconnect(this.#variantsConnection)
+        this.#variants.destroy()
         this.#crossRef.destroy()
     }
 })
@@ -1004,7 +1078,7 @@ const FontButton = GObject.registerClass({
         this.family = family
         this.child.label = family
         this.#cssProvider.load_from_string(`
-            textview, .char, .char-block {
+            textview, .char, .char-block, .variant-block {
                 font-family: "${family}";
             }
         `)
@@ -1628,16 +1702,16 @@ const stylesheet = `
 gridview {
     padding: 6px;
 }
-gridview child {
+gridview child, flowboxchild:selected {
     background: none;
 }
-gridview child:selected {
+gridview child:selected, flowboxchild:selected {
     outline: 0;
 }
-gridview child:selected .char-block {
+gridview child:selected .char-block, flowboxchild:selected .variant-block {
     outline: 2px solid color-mix(in srgb, var(--view-fg-color) var(--dim-opacity), transparent);
 }
-gridview child:focus .char-block {
+gridview child:focus .char-block, flowboxchild:focus .variant-block {
     outline-color: var(--accent-bg-color);
 }
 textview {
@@ -1646,7 +1720,7 @@ textview {
 .char {
     font-size: 64pt;
 }
-.char-block {
+.char-block, .variant-block {
     font-size: 20pt;
     border-radius: 4px;
 }
