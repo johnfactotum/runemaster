@@ -11,6 +11,7 @@ const Scripts = await readFile(ucdPath('Scripts.txt'))
 const ScriptExtensions = await readFile(ucdPath('ScriptExtensions.txt'))
 const PropertyValueAliases = await readFile(ucdPath('PropertyValueAliases.txt'))
 const StandardizedVariants = await readFile(ucdPath('StandardizedVariants.txt'))
+const emojiVariationSequences = await readFile(ucdPath('emoji/emoji-variation-sequences.txt'))
 const IVD_Sequences = await readFile('./ivd/IVD_Sequences.txt')
 
 const parse = str => str
@@ -27,6 +28,7 @@ const ucd = {
     ScriptExtensions: parse(ScriptExtensions),
     PropertyValueAliases: parse(PropertyValueAliases),
     StandardizedVariants: parse(StandardizedVariants),
+    emojiVariationSequences: parse(emojiVariationSequences),
     IVD_Sequences: parse(IVD_Sequences),
 }
 
@@ -85,7 +87,8 @@ const scripts = Array.from(Map.groupBy(ucd.Scripts
 })
 
 const variants = Map.groupBy(
-    ucd.StandardizedVariants.map(([f0, f1]) => [f0.split(' ').map(parseHex), f1])
+    ucd.StandardizedVariants.concat(ucd.emojiVariationSequences)
+        .map(([f0, f1]) => [f0.split(' ').map(parseHex), f1])
         .concat(ucd.IVD_Sequences.map(([f0, f1, f2]) => [f0.split(' ').map(parseHex), `${f1}; ${f2}`])),
     ([seq]) => seq[0],
 ).entries().map(([char, vars]) =>
