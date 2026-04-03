@@ -639,11 +639,11 @@ const CharInfo = GObject.registerClass({
             .get_line(0)?.runs[0]?.item?.analysis?.font.describe()?.get_family() ?? ''
     }
     async showCodepoint(code) {
+        if (this.#destroyed) return
         const obj = getCode(code)
         const char = String.fromCodePoint(code)
 
         const han = /\p{Script=Han}/u.test(char) ? (await unihan()).get(code) : null
-        if (this.#destroyed) return
         const radicals = han?.kRSUnicode?.split(' ')?.map(r => r.split('.'))
         this.#radical.label = !radicals ? '' : radicals.map(r =>
             `${String.fromCodePoint(0x2f00 + parseInt(r[0]) - 1)} + ${r[1]}`).join(' / ')
