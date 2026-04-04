@@ -1329,14 +1329,29 @@ const AppWindow = GObject.registerClass({
                 marginBottom: 24,
             }).$$.append(
                 this.#searchEntry,
-                new Gtk.Button({
-                    label: 'Find',
+                new Gtk.Box({
+                    spacing: 9,
                     halign: Gtk.Align.CENTER,
-                }).$$.add_css_class('pill', 'suggested-action')
-                    .$.connect('clicked', button => {
-                        button.root.close()
-                        this.search(this.#searchEntry.text)
-                    }),
+                }).$$.append(
+                    new Gtk.Button({
+                        label: 'Find',
+                    }).$$.add_css_class('pill', 'suggested-action')
+                        .$.connect('clicked', button => {
+                            button.root.close()
+                            this.search(this.#searchEntry.text)
+                        }),
+                    new Gtk.Button({
+                        label: 'Find Hex',
+                    }).$.add_css_class('pill')
+                        .$.connect('clicked', button => {
+                            button.root.close()
+                            const q = this.#searchEntry.text
+                            const code = parseCode(q)
+                                ?? escapeSequences.get(q)
+                                ?? parseInt(q, 16)
+                            this.showCodepoint(code)
+                        }),
+                ),
             ),
         }).$.add_top_bar(new Adw.HeaderBar()),
     })
