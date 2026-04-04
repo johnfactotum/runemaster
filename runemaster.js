@@ -179,6 +179,8 @@ const escapeSequences = new Map([
     ['\\e', 0x1b],
 ])
 
+const parseHex = str => /^[0-9A-Fa-f]+$/.test(str) ? parseInt(str, 16) : NaN
+
 const hexRegex = new RegExp([
     /(?:[Uu]\+|0x|\\x|\\[Uu])([0-9A-Fa-f]+)/,
     /&#x([0-9A-Fa-f]+);/,
@@ -1265,7 +1267,7 @@ const AppWindow = GObject.registerClass({
         if (type === 'search' && !data) {
             const codes = searchByName(name)
             if (!codes.length) {
-                const code = parseInt(name, 16)
+                const code = parseHex(name)
                 if (!isNaN(code) && getBlock(code)) this.showCodepoint(code)
                 else this.#alert('No Results', 'No matches found')
                 return
@@ -1350,7 +1352,7 @@ const AppWindow = GObject.registerClass({
                             const q = this.#searchEntry.text
                             const code = parseCode(q)
                                 ?? escapeSequences.get(q)
-                                ?? parseInt(q, 16)
+                                ?? parseHex(q)
                             this.showCodepoint(code)
                         }),
                 ),
