@@ -128,7 +128,6 @@ const readData = async path => JSON.parse(new TextDecoder().decode(
     (await Gio.File.new_for_uri(pkg.moduleuri(path))
         .load_contents_async(null))[0]))
 
-const formatHex = (x, pad = 4) => x.toString(16).toUpperCase().padStart(pad, '0')
 const data = await readData('data/data.json')
 
 const GC = new Map(data.aliases.gc)
@@ -180,6 +179,8 @@ const escapeSequences = new Map([
 ])
 
 const parseHex = str => /^[0-9A-Fa-f]+$/.test(str) ? parseInt(str, 16) : NaN
+const formatHex = (x, pad = 4) => x.toString(16).toUpperCase().padStart(pad, '0')
+const formatCode = code => `U+${formatHex(code)}`
 
 const hexRegex = new RegExp([
     /(?:[Uu]\+|0x|\\x|\\[Uu])([0-9A-Fa-f]+)/,
@@ -426,7 +427,7 @@ const Char = GObject.registerClass({
         const font = Adw.StyleManager.get_default().get_monospace_font_name()
         const code = this._text.codePointAt(0)
         const desc = esc(this.tooltipName || getCode(code).name)
-        const hex = this.tooltipCode || `U+${formatHex(code)}`
+        const hex = this.tooltipCode || formatCode(code)
         tooltip.set_markup(`<span font="${font} "alpha="60%">${hex}</span>\n${desc}`)
         return true
     }
@@ -455,7 +456,7 @@ const VariantsFlowBox = GObject.registerClass({
                 child: new Char({
                     text: seq.map(code => String.fromCodePoint(code)).join(''),
                     fontFallback: true,
-                    tooltipCode: seq.map(code => `U+${formatHex(code)}`).join(' '),
+                    tooltipCode: seq.map(formatCode).join(' '),
                     tooltipName: desc,
                 }),
             }).$.add_css_class('variant-block')
@@ -682,7 +683,7 @@ const CharInfo = GObject.registerClass({
             const { seq, desc } = item
             this.#char.text = seq.map(code => String.fromCodePoint(code)).join('')
             this.#updateFontInfo()
-            this.#code.label = seq.map(code => `U+${formatHex(code)}`).join(' ')
+            this.#code.label = seq.map(formatCode).join(' ')
             this.#name.label = `${this.#shortName.label}${desc ? ` (${desc})` : ''}`
             const charVar = GLib.Variant.new_string(this.#char.text)
             this.#copyButton.set_action_target_value(charVar)
@@ -738,7 +739,7 @@ const CharInfo = GObject.registerClass({
         this.#insertButton.set_action_target_value(charVar)
         this.#infoButton.set_action_target_value(GLib.Variant.new_uint32(code))
 
-        this.#code.label = `U+${formatHex(code)}`
+        this.#code.label = formatCode(code)
         this.#shortCode.label = this.#code.label
         this.#name.label = obj.originalName !== obj.name
             ? `${obj.originalName}\n${obj.originalName === '<control>' ? '' : '※'}${obj.name}`
