@@ -543,6 +543,8 @@ const CharInfo = GObject.registerClass({
     #fontDesc = new Pango.FontDescription()
     #code = new Gtk.Label({
         xalign: .5,
+        justify: Gtk.Justification.CENTER,
+        wrap: true,
         selectable: true,
     }).$$.add_css_class('monospace', 'dim-label')
     #shortCode = new Gtk.Label({

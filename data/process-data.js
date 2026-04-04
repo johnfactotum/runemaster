@@ -12,6 +12,8 @@ const ScriptExtensions = await readFile(ucdPath('ScriptExtensions.txt'))
 const PropertyValueAliases = await readFile(ucdPath('PropertyValueAliases.txt'))
 const StandardizedVariants = await readFile(ucdPath('StandardizedVariants.txt'))
 const emojiVariationSequences = await readFile(ucdPath('emoji/emoji-variation-sequences.txt'))
+const emojiSequences = await readFile('./emoji/emoji-sequences.txt')
+const emojiZwjSequences = await readFile('./emoji/emoji-zwj-sequences.txt')
 const IVD_Sequences = await readFile('./ivd/IVD_Sequences.txt')
 
 const parse = str => str
@@ -29,6 +31,8 @@ const ucd = {
     PropertyValueAliases: parse(PropertyValueAliases),
     StandardizedVariants: parse(StandardizedVariants),
     emojiVariationSequences: parse(emojiVariationSequences),
+    emojiSequences: parse(emojiSequences),
+    emojiZwjSequences: parse(emojiZwjSequences),
     IVD_Sequences: parse(IVD_Sequences),
 }
 
@@ -89,7 +93,9 @@ const scripts = Array.from(Map.groupBy(ucd.Scripts
 const variants = Map.groupBy(
     ucd.StandardizedVariants.concat(ucd.emojiVariationSequences)
         .map(([f0, f1]) => [f0.split(' ').map(parseHex), f1])
-        .concat(ucd.IVD_Sequences.map(([f0, f1, f2]) => [f0.split(' ').map(parseHex), `${f1}; ${f2}`])),
+        .concat(ucd.IVD_Sequences.concat(ucd.emojiSequences).concat(ucd.emojiZwjSequences)
+            .map(([f0, f1, f2]) => [f0.split(' ').map(parseHex), `${f1}; ${f2}`])
+            .filter(([, desc]) => !desc.startsWith('Basic_Emoji'))),
     ([seq]) => seq[0],
 ).entries().map(([char, vars]) =>
     [char, vars]).toArray()
