@@ -1265,7 +1265,9 @@ const AppWindow = GObject.registerClass({
         if (type === 'search' && !data) {
             const codes = searchByName(name)
             if (!codes.length) {
-                this.#alert('No Results', 'No matches found')
+                const code = parseInt(name, 16)
+                if (!isNaN(code) && getBlock(code)) this.showCodepoint(code)
+                else this.#alert('No Results', 'No matches found')
                 return
             }
             data = makeGObject({ codes })
