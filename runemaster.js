@@ -1155,9 +1155,15 @@ const FontDialog = GObject.registerClass({
                 titleWidget: searchEntry,
             }))
             .$.add_bottom_bar(new Gtk.ActionBar().$$.pack_start(
-                new Gtk.Image({ iconName: 'format-text-bold-symbolic' }),
+                new Gtk.Image({
+                    iconName: 'format-text-bold-symbolic',
+                    tooltipText: 'Weight',
+                }),
                 this.#weight,
-                new Gtk.Image({ iconName: 'format-text-italic-symbolic' }),
+                new Gtk.Image({
+                    iconName: 'format-text-italic-symbolic',
+                    tooltipText: 'Italic',
+                }),
                 this.#italic,
             ))
 
