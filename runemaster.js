@@ -1074,22 +1074,36 @@ const FontDialog = GObject.registerClass({
                         .$.connect('bind', (_, listItem) => {
                             listItem.child.label = listItem.item.string
                         }),
-                }).$.add_css_class('navigation-sidebar'),
+                }).$.add_css_class('navigation-sidebar')
+                    .$.connect('activate', () => this.close()),
             }),
         })
-            .$.add_top_bar(new Adw.HeaderBar())
-            .$.add_top_bar(new Gtk.ActionBar()
-                .$.set_center_widget(new Gtk.SearchEntry({ placeholderText: 'Filter…' })
+            .$.add_top_bar(new Adw.HeaderBar({
+                titleWidget: new Gtk.SearchEntry({
+                    placeholderText: 'Filter…',
+                    keyCaptureWidget: this,
+                })
                     .$.connect('search-changed', entry => {
                         const q = entry.text.toLowerCase()
                         this.#filter.set_filter_func(q ? item =>
                             item.string.toLowerCase()?.includes(q) : null)
-                    })))
+                    })
+                    .$.connect('activate', () => {
+                        const view = this.child.content.child
+                        if (view.model.get_n_items()) {
+                            view.model.select_item(0, true)
+                            this.close()
+                        }
+                    })
+                    .$.connect('search-started', entry => entry.grab_focus())
+                    .$.connect('stop-search', () => this.close()),
+            }))
     }
     present(...args) {
         if (!this.#list.get_n_items()) this.#list.splice(0, 0,
             this.get_pango_context().list_families().map(x => x.get_name()))
         super.present(...args)
+        this.grab_focus()
     }
 })
 
