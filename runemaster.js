@@ -242,6 +242,8 @@ const cangjieKeys = new Map([
     ['V','女'],['W','田'],['Y','卜'],['X','難'],['Z','重'],
 ])
 
+const segmenter = new Intl.Segmenter()
+
 /* widgets */
 
 const CHAR_PADDING = 18
@@ -1164,6 +1166,7 @@ const AppWindow = GObject.registerClass({
             .$.delete(start, end)
             .$.insert(start, f(text), -1)
             .$.end_user_action()
+        this.#scratchpadButton.active = true
         this.#textView.grab_focus()
     }
     #textToolbar = new Gtk.ActionBar()
@@ -1329,6 +1332,26 @@ const AppWindow = GObject.registerClass({
     search(q) {
         if (/^[A-Za-z]$/.test(q)) {
             this.openChars('search', q)
+            return
+        }
+        if ([...q].length > 1 && [...segmenter.segment(q)].length === 1) {
+            const composed = q.normalize('NFC')
+            const dialog = new Adw.AlertDialog({
+                heading: 'Multi-character Grapheme',
+                body: 'The query is composed of a sequence of characters',
+            })
+                .$.add_response('inspect', 'Inspect in Scratchpad')
+                .$.set_response_appearance('inspect', Adw.ResponseAppearance.SUGGESTED)
+                .$.connect('response', (_, res) => {
+                    if (res === 'inspect') this.transformBufferText(() => q)
+                    else if (res === 'view-precomposed')
+                        this.showCodepoint(composed.codePointAt(0))
+                })
+            if ([...composed].length === 1) {
+                dialog.body = 'The query is a sequence of characters, with an equivalent precomposed character',
+                dialog.add_response('view-precomposed', 'View Precomposed')
+            }
+            dialog.$.add_response('cancel', 'Cancel').present(this)
             return
         }
         const entity = entities.get(q)
