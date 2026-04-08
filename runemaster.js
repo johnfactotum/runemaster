@@ -1019,15 +1019,16 @@ const SidebarView = GObject.registerClass({
             })
             .$.connect('bind', (_, listItem) => {
                 listItem.child.label = listItem.item.name
+                listItem.child.tooltipText = listItem.item.name
             })
     }
     load(arr) {
         this.#list.splice(0, this.#list.get_n_items(), arr)
     }
     filter(q) {
-        q = q.toLowerCase()
+        q = q.toLowerCase().replace(/[\s_-]/g, ' ')
         this.model.model.filter.set_filter_func(q ? item =>
-            item.name.toLowerCase()?.includes(q) : null)
+            item.name.toLowerCase().replace(/[_-]/, ' ').includes(q) : null)
     }
 })
 
