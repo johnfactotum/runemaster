@@ -1152,6 +1152,7 @@ const AppWindow = GObject.registerClass({
         leftMargin: 12,
         rightMargin: 12,
         bottomMargin: 12,
+        acceptsTab: false,
     })
     #buffer = this.#textView.buffer.$.connect('changed', buffer => {
         this.#charsList.splice(0, this.#charsList.get_n_items(), getChars(buffer.text)
@@ -1422,8 +1423,8 @@ const AppWindow = GObject.registerClass({
     #scratchpadButton = new Gtk.ToggleButton({
         iconName: 'document-edit-symbolic',
         tooltipText: 'Scratchpad',
-    }).$.connect('notify::active', button =>
-        button.active ? this.#textView.grab_focus() : null)
+    }).$.connect('notify::active', button => (button.active ? this.#textView
+    : this.#tabView.selectedPage?.child ?? button).grab_focus())
     #fontButton = new FontButton({
         tooltipText: 'Font',
     }).$.connect('family-changed', (_, family) => {
@@ -1550,11 +1551,16 @@ const AppWindow = GObject.registerClass({
                 content: new Gtk.ScrolledWindow({ child: this.#columnView }),
             }),
         }).$.add_css_class('scratchpad')
-            .$.add_controller(new Gtk.ShortcutController()
-                .$.add_shortcut(new Gtk.Shortcut({
+            .$.add_controller(new Gtk.ShortcutController().$$.add_shortcut(
+                new Gtk.Shortcut({
                     action: Gtk.NamedAction.new('win.scratchpad-clear'),
                     trigger: Gtk.ShortcutTrigger.parse_string('<ctrl>u'),
-                })))
+                }),
+                new Gtk.Shortcut({
+                    action: Gtk.NamedAction.new('win.scratchpad-close'),
+                    trigger: Gtk.ShortcutTrigger.parse_string('Escape'),
+                }),
+            ))
 
         const scratchPadBin = new Adw.BreakpointBin({
             child: scratchpad,
@@ -1696,6 +1702,9 @@ const AppWindow = GObject.registerClass({
                         case 'not-alpha': return text.replaceAll(/[^\p{Alphabetic}]/gu, '')
                     }
                 })
+            }),
+            new Gio.SimpleAction({ name: 'scratchpad-close' }).$.connect('activate', () => {
+                this.#scratchpadButton.active = false
             }),
             new Gio.SimpleAction({
                 name: 'copy',
