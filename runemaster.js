@@ -983,7 +983,8 @@ const CharsView = GObject.registerClass({
     showCodepoint(code) {
         for (const [i, item] of gliter(this.#gridView.model))
             if (item.code === code) {
-                this.#gridView.scroll_to(i, Gtk.ListScrollFlags.SELECT, null)
+                this.#gridView.scroll_to(i,
+                    Gtk.ListScrollFlags.FOCUS | Gtk.ListScrollFlags.SELECT, null)
                 return
             }
     }
@@ -1524,6 +1525,7 @@ const AppWindow = GObject.registerClass({
                 iconName: 'edit-find-symbolic',
                 tooltipText: 'Find Character',
                 actionName: 'win.search',
+                focusOnClick: false,
             })))
             .$.add_top_bar(tabBar)
 
