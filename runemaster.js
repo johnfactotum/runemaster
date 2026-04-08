@@ -275,6 +275,8 @@ const Char = GObject.registerClass({
     }),
 }, class extends Gtk.Widget {
     #fontDesc = new Pango.FontDescription()
+    #dragSource = new Gtk.DragSource()
+    #dragSourceConnection
     constructor(params) {
         super(params)
         this.hasTooltip = true
@@ -286,6 +288,7 @@ const Char = GObject.registerClass({
             this.layout.set_attributes(attrs)
         }
         this.#fontDesc.set_size(8 * Pango.SCALE)
+        this.add_controller(this.#dragSource)
     }
     get text() {
         return this._text ?? ''
@@ -448,6 +451,13 @@ const Char = GObject.registerClass({
         const hex = this.tooltipCode || formatCode(code)
         tooltip.set_markup(`<span font="${font} "alpha="60%">${hex}</span>\n${desc}`)
         return true
+    }
+    vfunc_root() {
+        this.#dragSourceConnection = this.#dragSource.connect('prepare', () =>
+            Gdk.ContentProvider.new_for_value(this.text))
+    }
+    vfunc_unroot() {
+        this.#dragSource.disconnect(this.#dragSourceConnection)
     }
 })
 
