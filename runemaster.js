@@ -1699,7 +1699,20 @@ const AppWindow = GObject.registerClass({
             }).$.connect('activate', (_, param) => {
                 this.copyText(param.unpack())
             }),
+            new Gio.SimpleAction({
+                name: 'paste',
+            }).$.connect('activate', () => {
+                Gdk.Display.get_default().get_clipboard().read_text_async(null)
+                    .then(text => this.transformBufferText(() => text))
+                    .catch(e => console.error(e))
+            }),
         )
+
+        this.add_controller(new Gtk.ShortcutController()
+            .$.add_shortcut(new Gtk.Shortcut({
+                action: Gtk.NamedAction.new('win.paste'),
+                trigger: Gtk.ShortcutTrigger.parse_string('<ctrl>v'),
+            })))
 
         this.openChars('script', 'Latin')
     }
