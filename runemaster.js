@@ -1112,6 +1112,26 @@ const FontDialog = GObject.registerClass({
         this.title = 'Choose Font'
         this.contentWidth = 360
         this.contentHeight = 420
+
+        const searchEntry = new Gtk.SearchEntry({
+            placeholderText: 'Filter…',
+            keyCaptureWidget: this,
+        })
+            .$.connect('search-changed', entry => {
+                const q = entry.text.toLowerCase()
+                this.#filter.set_filter_func(q ? item =>
+                    item.string.toLowerCase()?.includes(q) : null)
+            })
+            .$.connect('activate', () => {
+                const view = this.child.content.child
+                if (view.model.get_n_items()) {
+                    view.model.select_item(0, true)
+                    this.close()
+                }
+            })
+            .$.connect('search-started', entry => entry.grab_focus())
+            .$.connect('stop-search', () => this.close())
+
         this.child = new Adw.ToolbarView({
             content: new Gtk.ScrolledWindow({
                 child: new Gtk.ListView({
@@ -1132,24 +1152,7 @@ const FontDialog = GObject.registerClass({
             }),
         })
             .$.add_top_bar(new Adw.HeaderBar({
-                titleWidget: new Gtk.SearchEntry({
-                    placeholderText: 'Filter…',
-                    keyCaptureWidget: this,
-                })
-                    .$.connect('search-changed', entry => {
-                        const q = entry.text.toLowerCase()
-                        this.#filter.set_filter_func(q ? item =>
-                            item.string.toLowerCase()?.includes(q) : null)
-                    })
-                    .$.connect('activate', () => {
-                        const view = this.child.content.child
-                        if (view.model.get_n_items()) {
-                            view.model.select_item(0, true)
-                            this.close()
-                        }
-                    })
-                    .$.connect('search-started', entry => entry.grab_focus())
-                    .$.connect('stop-search', () => this.close()),
+                titleWidget: searchEntry,
             }))
             .$.add_bottom_bar(new Gtk.ActionBar().$$.pack_start(
                 new Gtk.Image({ iconName: 'format-text-bold-symbolic' }),
@@ -1157,6 +1160,12 @@ const FontDialog = GObject.registerClass({
                 new Gtk.Image({ iconName: 'format-text-italic-symbolic' }),
                 this.#italic,
             ))
+
+        this.add_controller(new Gtk.ShortcutController().$.add_shortcut(
+            new Gtk.Shortcut({
+                action: Gtk.CallbackAction.new(() => searchEntry.grab_focus()),
+                trigger: Gtk.ShortcutTrigger.parse_string('<ctrl>f'),
+            })))
     }
     present(...args) {
         if (!this.#list.get_n_items()) this.#list.splice(0, 0,
