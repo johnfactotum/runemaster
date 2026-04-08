@@ -437,13 +437,15 @@ const VariantsFlowBox = GObject.registerClass({
     GTypeName: 'RunemasterVariantsFlowBox',
     Signals: {
         'selection-changed': { param_types: [GObject.TYPE_OBJECT] },
+        'activated': { param_types: [GObject.TYPE_OBJECT] },
     },
 }, class extends Adw.Bin {
     #flowBox = new Gtk.FlowBox({
         selectionMode: Gtk.SelectionMode.BROWSE,
+        activateOnSingleClick: false,
     })
     #model = new Gio.ListStore()
-    #connection
+    #connections
     label
     constructor(params) {
         super(params)
@@ -461,11 +463,17 @@ const VariantsFlowBox = GObject.registerClass({
                 }),
             }).$.add_css_class('variant-block')
         })
-        this.#connection = this.#flowBox.connect('selected-children-changed', box => {
-            const children = box.get_selected_children()
-            const item = children[0] ? this.#model.get_item(children[0].get_index()) : null
-            this.emit('selection-changed', item)
-        })
+        this.#connections = [
+            this.#flowBox.connect('selected-children-changed', box => {
+                const children = box.get_selected_children()
+                const item = children[0] ? this.#model.get_item(children[0].get_index()) : null
+                this.emit('selection-changed', item)
+            }),
+            this.#flowBox.connect('child-activated', (_, child) => {
+                const item = this.#model.get_item(child.get_index())
+                this.emit('activated', item)
+            }),
+        ]
     }
     load(arr) {
         this.label = !!arr.length
@@ -474,7 +482,8 @@ const VariantsFlowBox = GObject.registerClass({
             this.#flowBox.select_child(this.#flowBox.get_child_at_index(0))
     }
     destroy() {
-        this.#flowBox.disconnect(this.#connection)
+        for (const connection of this.#connections)
+            this.#flowBox.disconnect(connection)
     }
 })
 
@@ -567,7 +576,7 @@ const CharInfo = GObject.registerClass({
         ellipsize: Pango.EllipsizeMode.MIDDLE,
     })
     #variants = new VariantsFlowBox()
-    #variantsConnection
+    #variantsConnections
     #block = makeProp()
     #font = makeProp()
     #category = makeProp()
@@ -584,6 +593,10 @@ const CharInfo = GObject.registerClass({
     #readings = makeProp()
     #definition = makeProp()
     #cangjie = makeProp()
+    #copyShortcut = new Gtk.Shortcut({
+        action: Gtk.NamedAction.new('win.copy'),
+        trigger: Gtk.ShortcutTrigger.parse_string('<ctrl>c'),
+    })
     #copyButton = new Gtk.Button({
         valign: Gtk.Align.CENTER,
         iconName: 'edit-copy-symbolic',
@@ -670,6 +683,9 @@ const CharInfo = GObject.registerClass({
                 ['copy-button', this.#copyButton],
             )
 
+        this.add_controller(new Gtk.ShortcutController()
+            .$.add_shortcut(this.#copyShortcut))
+
         this.#gridItems.forEach((a, i) => Array.isArray(a)
             ? a.forEach((b, j) => this.#grid.attach(b, j, i, 1, 1))
             : this.#grid.attach(a, 0, i, 2, 1))
@@ -678,17 +694,26 @@ const CharInfo = GObject.registerClass({
             this.root.showCodepoint(parseInt(link.split('#')[1], 16))
             return true
         })
-        this.#variantsConnection = this.#variants.connect('selection-changed', (_, item) => {
-            if (!item) return
-            const { seq, desc } = item
-            this.#char.text = seq.map(code => String.fromCodePoint(code)).join('')
-            this.#updateFontInfo()
-            this.#code.label = seq.map(formatCode).join(' ')
-            this.#name.label = `${this.#shortName.label}${desc ? ` (${desc})` : ''}`
-            const charVar = GLib.Variant.new_string(this.#char.text)
-            this.#copyButton.set_action_target_value(charVar)
-            this.#insertButton.set_action_target_value(charVar)
-        })
+        this.#variantsConnections = [
+            this.#variants.connect('selection-changed', (_, item) => {
+                if (!item) return
+                const { seq, desc } = item
+                this.#char.text = seq.map(code => String.fromCodePoint(code)).join('')
+                this.#updateFontInfo()
+                this.#code.label = seq.map(formatCode).join(' ')
+                this.#name.label = `${this.#shortName.label}${desc ? ` (${desc})` : ''}`
+                const charVar = GLib.Variant.new_string(this.#char.text)
+                this.#copyShortcut.set_arguments(charVar)
+                this.#copyButton.set_action_target_value(charVar)
+                this.#insertButton.set_action_target_value(charVar)
+            }),
+            this.#variants.connect('activated', (_, item) => {
+                const { seq } = item
+                const text = seq.map(code => String.fromCodePoint(code)).join('')
+                this.root.lookup_action('scratchpad-insert')
+                    .activate(GLib.Variant.new_string(text))
+            }),
+        ]
     }
     setLayout(layout) {
         if (layout === 'short') this.child.set_layout_name('short')
@@ -735,6 +760,7 @@ const CharInfo = GObject.registerClass({
         this.#updateFontInfo()
 
         const charVar = GLib.Variant.new_string(char)
+        this.#copyShortcut.set_arguments(charVar)
         this.#copyButton.set_action_target_value(charVar)
         this.#insertButton.set_action_target_value(charVar)
         this.#infoButton.set_action_target_value(GLib.Variant.new_uint32(code))
@@ -800,7 +826,8 @@ const CharInfo = GObject.registerClass({
     destroy() {
         this.#destroyed = true
         this.#comment.disconnect(this.#commentConnection)
-        this.#variants.disconnect(this.#variantsConnection)
+        for (const connection of this.#variantsConnections)
+            this.#variants.disconnect(connection)
         this.#variants.destroy()
         this.#crossRef.destroy()
     }
@@ -869,7 +896,7 @@ const CharsView = GObject.registerClass({
                 }))
                 .$.set_child('info', this.#charInfo))
 
-        this.add_controller(new Gtk.ShortcutController()
+        this.#gridView.add_controller(new Gtk.ShortcutController()
             .$.add_shortcut(this.#copyShortcut))
 
         this.#connections.set(this.#breakpoint, [
