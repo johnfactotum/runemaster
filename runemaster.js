@@ -919,11 +919,8 @@ const CharsView = GObject.registerClass({
             }),
         ])
         this.#connections.set(this.#selection, [
-            this.#selection.connect('selection-changed', model => {
-                const code = model.selected_item.code
-                this.#copyShortcut.arguments = GLib.Variant.new_string(
-                    String.fromCodePoint(code))
-                this.showCodeInfo(code)
+            this.#selection.connect('selection-changed', () => {
+                this.showCodeInfo()
             }),
         ])
         this.#connections.set(this.#factory, [
@@ -989,6 +986,8 @@ const CharsView = GObject.registerClass({
             }
     }
     showCodeInfo() {
+        this.#copyShortcut.arguments = GLib.Variant.new_string(
+            String.fromCodePoint(this.selectedCode))
         this.#charInfo.showCodepoint(this.selectedCode)
             .catch(e => console.log(e))
     }
