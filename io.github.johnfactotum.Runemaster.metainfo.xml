@@ -39,6 +39,17 @@
         </screenshot>
     </screenshots>
     <releases>
+        <release version="1.2.0" date="2026-04-08">
+            <description>
+                <ul>
+                    <li>Support for variation sequences</li>
+                    <li>Set font weight and font style</li>
+                    <li>Improved finding characters</li>
+                    <li>Drag and drop characters</li>
+                    <li>New keyboard shortcuts</li>
+                </ul>
+            </description>
+        </release>
         <release version="1.1.0" date="2025-11-28">
             <description>
                 <ul>
@@ -55,4 +66,12 @@
         </release>
     </releases>
     <content_rating type="oars-1.1" />
+    <supports>
+        <control>keyboard</control>
+        <control>pointing</control>
+        <control>touch</control>
+    </supports>
+    <requires>
+        <display_length compare="ge">360</display_length>
+    </requires>
 </component>

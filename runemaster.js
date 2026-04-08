@@ -1927,9 +1927,11 @@ app
         new Adw.AboutDialog({
             applicationName: 'Runemaster',
             applicationIcon: pkg.id,
-            version: '1.0.0',
+            version: '1.2.0',
             developerName: 'John Factotum',
             licenseType: Gtk.License.GPL_3_0,
+            website: 'https://github.com/johnfactotum/runemaster',
+            issue_url: 'https://github.com/johnfactotum/runemaster/issues',
         })
             .$.add_legal_section('Unicode Data Files',
                 'Copyright © 1991-2025 Unicode, Inc.',
