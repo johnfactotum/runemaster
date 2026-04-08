@@ -994,6 +994,9 @@ const CharsView = GObject.registerClass({
     setFamily(family) {
         this.#charInfo.setFamily(family)
     }
+    grab_focus() {
+        return this.#gridView.grab_focus()
+    }
 })
 
 const SidebarView = GObject.registerClass({
@@ -1319,6 +1322,7 @@ const AppWindow = GObject.registerClass({
         if (type === 'search') page.icon = Gio.ThemedIcon.new('edit-find-symbolic')
         tabView.selectedPage = page
         if (code != null) page.child.showCodepoint(code)
+        page.child.grab_focus()
     }
     #alert(heading, body) {
         new Adw.AlertDialog({ heading, body })
