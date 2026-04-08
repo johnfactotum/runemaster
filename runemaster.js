@@ -1033,6 +1033,9 @@ const SidebarView = GObject.registerClass({
         this.model.model.filter.set_filter_func(q ? item =>
             item.name.toLowerCase().replace(/[_-]/, ' ').includes(q) : null)
     }
+    activate() {
+        if (this.model.get_n_items()) this.emit('activate', 0)
+    }
 })
 
 const FontDialog = GObject.registerClass({
@@ -1501,6 +1504,8 @@ const AppWindow = GObject.registerClass({
                 }).$.connect('search-changed', entry => {
                     scriptListView.filter(entry.text)
                     blockListView.filter(entry.text)
+                }).$.connect('activate', () => {
+                    stack.visibleChild.child.activate()
                 })))
 
         const tabBar = new Adw.TabBar({ autohide: false, view: this.#tabView })
