@@ -1515,6 +1515,16 @@ const AppWindow = GObject.registerClass({
         }
         this.#bottomSheetCharInfo.setFont(font)
     })
+    #menuButton = new Gtk.MenuButton({
+        iconName: 'open-menu-symbolic',
+        tooltipText: 'Menu',
+        menuModel: new Gio.Menu()
+            .$.append('Use Fallback Fonts', 'win.font-fallback')
+            .$.append('Show Category Colors', 'win.show-category-colors')
+            .$.append_section(null, new Gio.Menu()
+                .$.append('Keyboard Shortcuts', 'win.shortcuts-dialog')
+                .$.append('About Runemaster', 'app.about')),
+    })
     constructor(params) {
         super(params)
 
@@ -1571,20 +1581,28 @@ const AppWindow = GObject.registerClass({
                 child: blockListView,
             }), 'block', 'Blocks', 'application-x-addon-symbolic')
 
+        const listPaneEntry = new Gtk.SearchEntry({
+            placeholderText: 'Filter…',
+        }).$.connect('search-changed', entry => {
+            scriptListView.filter(entry.text)
+            blockListView.filter(entry.text)
+        }).$.connect('activate', () => {
+            stack.visibleChild.child.activate()
+        }).$.add_controller(new Gtk.ShortcutController().$.add_shortcut(
+            new Gtk.Shortcut({
+                action: Gtk.CallbackAction.new(() => {
+                    if (listPaneEntry.text) listPaneEntry.text = ''
+                    else this.#tabView.selectedPage.child.grab_focus()
+                }),
+                trigger: Gtk.ShortcutTrigger.parse_string('Escape'),
+            })))
         const listPane = new Adw.ToolbarView({
             content: stack,
         })
             .$.add_top_bar(new Adw.HeaderBar()
                 .$.set_title_widget(new Adw.InlineViewSwitcher({ stack })))
             .$.add_top_bar(new Gtk.ActionBar()
-                .$.set_center_widget(new Gtk.SearchEntry({
-                    placeholderText: 'Filter…',
-                }).$.connect('search-changed', entry => {
-                    scriptListView.filter(entry.text)
-                    blockListView.filter(entry.text)
-                }).$.connect('activate', () => {
-                    stack.visibleChild.child.activate()
-                })))
+                .$.set_center_widget(listPaneEntry))
 
         const tabBar = new Adw.TabBar({ autohide: false, view: this.#tabView })
         const setTabBarLayout = ({ gtkDecorationLayout: layout }) =>
@@ -1599,15 +1617,7 @@ const AppWindow = GObject.registerClass({
         }).$.add_top_bar(new Adw.HeaderBar()
             .$.set_title_widget(this.#fontButton)
             .$$.pack_start(this.#sidebarButton, this.#scratchpadButton)
-            .$.pack_end(new Gtk.MenuButton({
-                iconName: 'open-menu-symbolic',
-                tooltipText: 'Menu',
-                menuModel: new Gio.Menu()
-                    .$.append('Use Fallback Fonts', 'win.font-fallback')
-                    .$.append('Show Category Colors', 'win.show-category-colors')
-                    .$.append_section(null, new Gio.Menu()
-                        .$.append('About Runemaster', 'app.about')),
-            }))
+            .$.pack_end(this.#menuButton)
             .$.pack_end(new Gtk.Button({
                 iconName: 'edit-find-symbolic',
                 tooltipText: 'Find Character',
@@ -1640,7 +1650,8 @@ const AppWindow = GObject.registerClass({
                     trigger: Gtk.ShortcutTrigger.parse_string('<ctrl>u'),
                 }),
                 new Gtk.Shortcut({
-                    action: Gtk.NamedAction.new('win.scratchpad-close'),
+                    action: Gtk.CallbackAction.new(() =>
+                        this.#scratchpadButton.active = false),
                     trigger: Gtk.ShortcutTrigger.parse_string('Escape'),
                 }),
             ))
@@ -1786,9 +1797,6 @@ const AppWindow = GObject.registerClass({
                     }
                 })
             }),
-            new Gio.SimpleAction({ name: 'scratchpad-close' }).$.connect('activate', () => {
-                this.#scratchpadButton.active = false
-            }),
             new Gio.SimpleAction({
                 name: 'copy',
                 parameterType: new GLib.VariantType('s'),
@@ -1802,13 +1810,88 @@ const AppWindow = GObject.registerClass({
                     .then(text => this.transformBufferText(() => text))
                     .catch(e => console.error(e))
             }),
+            new Gio.SimpleAction({
+                name: 'shortcuts-dialog',
+            }).$.connect('activate', () => {
+                this.shortcutsDialog ??= new Adw.ShortcutsDialog().$$.add(
+                    Adw.ShortcutsSection.new('Character Grid').$$.add(
+                        Adw.ShortcutsItem.new('Copy Character', '<ctrl>c'),
+                        Adw.ShortcutsItem.new('Insert Character', 'Return'),
+                    ),
+                    Adw.ShortcutsSection.new('').$$.add(
+                        Adw.ShortcutsItem.new('Find Character', '<ctrl>f slash'),
+                        Adw.ShortcutsItem.new('Choose Font', '<ctrl><shift>f'),
+                    ),
+                    Adw.ShortcutsSection.new('Scratchpad').$$.add(
+                        Adw.ShortcutsItem.new('Toggle Scratchpad', '<ctrl>F9'),
+                        Adw.ShortcutsItem.new('Move Focus to Scratchpad', '<alt>p'),
+                        Adw.ShortcutsItem.new('Paste to Scratchpad', '<ctrl>v'),
+                    ),
+                    Adw.ShortcutsSection.new('Panes').$$.add(
+                        Adw.ShortcutsItem.new('Toggle Sidebar', 'F9'),
+                        Adw.ShortcutsItem.new('Show Scripts', '<alt>s'),
+                        Adw.ShortcutsItem.new('Show Blocks', '<alt>b'),
+                        Adw.ShortcutsItem.new('Move Focus to Main Area', '<alt>m'),
+                    ),
+                    Adw.ShortcutsSection.new('General').$$.add(
+                        Adw.ShortcutsItem.new('Open Menu', 'F10'),
+                        Adw.ShortcutsItem.new('Close Tab', '<ctrl>w'),
+                        Adw.ShortcutsItem.new('Quit', '<ctrl>q'),
+                    ),
+                )
+                this.shortcutsDialog.$.present(this).grab_focus()
+            }),
         )
 
-        this.add_controller(new Gtk.ShortcutController()
-            .$.add_shortcut(new Gtk.Shortcut({
+        this.add_controller(new Gtk.ShortcutController().$$.add_shortcut(
+            new Gtk.Shortcut({
                 action: Gtk.NamedAction.new('win.paste'),
                 trigger: Gtk.ShortcutTrigger.parse_string('<ctrl>v'),
-            })))
+            }),
+            new Gtk.Shortcut({
+                action: Gtk.NamedAction.new('win.search'),
+                trigger: Gtk.ShortcutTrigger.parse_string('<ctrl>f|slash'),
+            }),
+            new Gtk.Shortcut({
+                action: Gtk.CallbackAction.new(() => this.#fontButton.vfunc_clicked()),
+                trigger: Gtk.ShortcutTrigger.parse_string('<ctrl><shift>f'),
+            }),
+            new Gtk.Shortcut({
+                action: Gtk.CallbackAction.new(() => {
+                    this.#sidebarButton.active = true
+                    stack.visibleChildName = 'script'
+                    listPaneEntry.select_region(0, -1)
+                    listPaneEntry.grab_focus()
+                }),
+                trigger: Gtk.ShortcutTrigger.parse_string('<alt>s'),
+            }),
+            new Gtk.Shortcut({
+                action: Gtk.CallbackAction.new(() => {
+                    this.#sidebarButton.active = true
+                    stack.visibleChildName = 'block'
+                    listPaneEntry.select_region(0, -1)
+                    listPaneEntry.grab_focus()
+                }),
+                trigger: Gtk.ShortcutTrigger.parse_string('<alt>b'),
+            }),
+            new Gtk.Shortcut({
+                action: Gtk.CallbackAction.new(() => {
+                    this.#scratchpadButton.active = true
+                    this.#textView.grab_focus()
+                }),
+                trigger: Gtk.ShortcutTrigger.parse_string('<alt>p'),
+            }),
+            new Gtk.Shortcut({
+                action: Gtk.CallbackAction.new(() =>
+                    this.#tabView.selectedPage.child.grab_focus()),
+                trigger: Gtk.ShortcutTrigger.parse_string('<alt>m'),
+            }),
+            new Gtk.Shortcut({
+                action: Gtk.CallbackAction.new(() =>
+                    this.#menuButton.active = true),
+                trigger: Gtk.ShortcutTrigger.parse_string('F10'),
+            }),
+        ))
 
         this.openChars('script', 'Latin')
     }
@@ -1845,6 +1928,7 @@ app
         ['win.search', ['<ctrl>f']],
         ['win.scratchpad', ['<ctrl>F9']],
         ['win.sidebar', ['F9']],
+        ['win.shortcuts-dialog', ['<ctrl>question']],
         ['app.quit', ['<ctrl>q']],
         ['app.about', ['F1']],
     )
