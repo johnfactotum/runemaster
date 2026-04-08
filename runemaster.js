@@ -79,7 +79,8 @@ Object.defineProperty(GObject.Object.prototype, '$$', {
 })
 
 const makeParams = obj => Object.fromEntries(Object.entries(obj).map(([k, v]) => {
-    const type = typeof v === 'string' ? v : 'object'
+    const type = typeof v === 'string' ? v
+        : GObject.type_is_a(v, GObject.TYPE_BOXED) ? 'boxed' : 'object'
     const flags = GObject.ParamFlags.READWRITE
     return [k, GObject.ParamSpec[type](k, k, k, flags, ...(
         type === 'string' ? ['']
@@ -121,6 +122,21 @@ const bindSettings = (name, target, arr) => {
         s.bind(prop, target, prop, Gio.SettingsBindFlags.DEFAULT)
     return s
 }
+
+const PANGO_WEIGHTS = [
+    Pango.Weight.THIN,
+    Pango.Weight.ULTRALIGHT,
+    Pango.Weight.LIGHT,
+    Pango.Weight.SEMILIGHT,
+    Pango.Weight.BOOK,
+    Pango.Weight.NORMAL,
+    Pango.Weight.MEDIUM,
+    Pango.Weight.SEMIBOLD,
+    Pango.Weight.BOLD,
+    Pango.Weight.ULTRABOLD,
+    Pango.Weight.HEAVY,
+    Pango.Weight.ULTRAHEAVY,
+]
 
 /* Unicode data */
 
@@ -724,8 +740,10 @@ const CharInfo = GObject.registerClass({
             this.root.closeBottomSheet()
         }
     }
-    setFamily(family) {
-        this.#fontDesc.set_family(family)
+    setFont(font) {
+        this.#fontDesc.set_family(font.get_family())
+        this.#fontDesc.set_weight(font.get_weight())
+        this.#fontDesc.set_style(font.get_style())
         this.#updateFontInfo()
     }
     #updateFontInfo() {
@@ -991,8 +1009,8 @@ const CharsView = GObject.registerClass({
         this.#charInfo.showCodepoint(this.selectedCode)
             .catch(e => console.log(e))
     }
-    setFamily(family) {
-        this.#charInfo.setFamily(family)
+    setFont(font) {
+        this.#charInfo.setFont(font)
     }
     grab_focus() {
         return this.#gridView.grab_focus()
@@ -1040,30 +1058,55 @@ const SidebarView = GObject.registerClass({
 
 const FontDialog = GObject.registerClass({
     GTypeName: 'RunemasterFontDialog',
+    Properties: makeParams({
+        'font': Pango.FontDescription,
+    }),
     Signals: {
-        'family-changed': { param_types: [GObject.TYPE_STRING] },
+        'font-changed': { param_types: [GObject.TYPE_JSOBJECT] },
     },
 }, class extends Adw.Dialog {
     #list = new Gtk.StringList()
     #filter = new Gtk.CustomFilter()
+    #weight = new Gtk.Scale({
+        hexpand: true,
+        roundDigits: 0,
+        adjustment: new Gtk.Adjustment({
+            lower: 0, upper: 11,
+            stepIncrement: 1, pageIncrement: 4,
+            value: 5,
+        }),
+    }).$$.add_mark(
+        [5, Gtk.PositionType.BOTTOM, 'Normal'],
+        [8, Gtk.PositionType.BOTTOM, 'Bold'],
+    ).$.connect('value-changed', () => this.#update())
+    #italic = new Gtk.Switch({
+        valign: Gtk.Align.CENTER,
+    }).$.connect('notify::active', () => this.#update())
+    #model = new Gtk.SingleSelection({
+        autoselect: false,
+        canUnselect: true,
+        model: new Gtk.FilterListModel({
+            model: this.#list,
+            filter: this.#filter,
+        }),
+    }).$.connect('selection-changed', () => this.#update())
+    #update() {
+        const font = this.font
+        if (this.#model.selected_item) font.set_family(this.#model.selected_item.string)
+        font.set_weight(PANGO_WEIGHTS[this.#weight.get_value()])
+        font.set_style(this.#italic.active ? Pango.Style.ITALIC : Pango.Style.NORMAL)
+        this.emit('font-changed', font)
+    }
     constructor(params) {
         super(params)
         this.title = 'Choose Font'
         this.contentWidth = 360
-        this.contentHeight = 720
+        this.contentHeight = 420
         this.child = new Adw.ToolbarView({
             content: new Gtk.ScrolledWindow({
                 child: new Gtk.ListView({
                     tabBehavior: Gtk.ListTabBehavior.ITEM,
-                    model: new Gtk.SingleSelection({
-                        autoselect: false,
-                        canUnselect: true,
-                        model: new Gtk.FilterListModel({
-                            model: this.#list,
-                            filter: this.#filter,
-                        }),
-                    }).$.connect('selection-changed', model =>
-                        this.emit('family-changed', model.selected_item.string)),
+                    model: this.#model,
                     factory: new Gtk.SignalListItemFactory()
                         .$.connect('setup', (_, listItem) => {
                             listItem.child = new Gtk.Label({
@@ -1098,6 +1141,12 @@ const FontDialog = GObject.registerClass({
                     .$.connect('search-started', entry => entry.grab_focus())
                     .$.connect('stop-search', () => this.close()),
             }))
+            .$.add_bottom_bar(new Gtk.ActionBar().$$.pack_start(
+                new Gtk.Image({ iconName: 'format-text-bold-symbolic' }),
+                this.#weight,
+                new Gtk.Image({ iconName: 'format-text-italic-symbolic' }),
+                this.#italic,
+            ))
     }
     present(...args) {
         if (!this.#list.get_n_items()) this.#list.splice(0, 0,
@@ -1110,14 +1159,14 @@ const FontDialog = GObject.registerClass({
 const FontButton = GObject.registerClass({
     GTypeName: 'RunemasterFontButton',
     Signals: {
-        'family-changed': { param_types: [GObject.TYPE_STRING] },
+        'font-changed': { param_types: [Pango.FontDescription] },
     },
 }, class extends Gtk.Button {
-    #fontDialog = new FontDialog()
-        .$.connect('family-changed', (_, family) => this.setFamily(family))
+    #fontDialog = new FontDialog({
+        font: Pango.FontDescription.from_string(
+            Adw.StyleManager.get_default().get_document_font_name()),
+    }).$.connect('font-changed', (_, font) => this.#update(font))
     #cssProvider = new Gtk.CssProvider()
-    family = Pango.FontDescription.from_string(
-        Adw.StyleManager.get_default().get_document_font_name()).get_family()
     constructor(params) {
         super(params)
         this.add_css_class('raised')
@@ -1127,17 +1176,22 @@ const FontButton = GObject.registerClass({
         })
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(),
             this.#cssProvider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-        this.setFamily(this.family)
+        this.#update(this.font)
     }
-    setFamily(family) {
-        this.family = family
-        this.child.label = family
+    get font() {
+        return this.#fontDialog.font
+    }
+    #update() {
+        const { font } = this
+        this.child.label = font.get_family()
         this.#cssProvider.load_from_string(`
             textview, .char, .char-block, .variant-block {
-                font-family: "${family}";
+                font-family: "${font.get_family()}";
+                font-weight: ${font.get_weight()};
+                font-style: ${font.get_style() === Pango.Style.ITALIC ? 'italic' : 'normal'};
             }
         `)
-        this.emit('family-changed', family)
+        this.emit('font-changed', font)
     }
     vfunc_clicked() {
         this.#fontDialog.present(this.root)
@@ -1329,7 +1383,7 @@ const AppWindow = GObject.registerClass({
         }
 
         const charsView = new CharsView({ type, name, data })
-            .$.setFamily(this.#fontButton.family)
+            .$.setFont(this.#fontButton.font)
         const page = tabView.append(charsView)
         page.type = type
         page.title = name
@@ -1444,12 +1498,12 @@ const AppWindow = GObject.registerClass({
     : this.#tabView.selectedPage?.child ?? button).grab_focus())
     #fontButton = new FontButton({
         tooltipText: 'Font',
-    }).$.connect('family-changed', (_, family) => {
+    }).$.connect('font-changed', (_, font) => {
         for (let i = 0; i < this.#tabView.nPages; i++) {
             const page = this.#tabView.get_nth_page(i)
-            page.child.setFamily(family)
+            page.child.setFont(font)
         }
-        this.#bottomSheetCharInfo.setFamily(family)
+        this.#bottomSheetCharInfo.setFont(font)
     })
     constructor(params) {
         super(params)
@@ -1463,7 +1517,7 @@ const AppWindow = GObject.registerClass({
             }
         })
 
-        this.#bottomSheetCharInfo.setFamily(this.#fontButton.family)
+        this.#bottomSheetCharInfo.setFont(this.#fontButton.font)
 
         this.#textView.extraMenu = new Gio.Menu()
             .$.append_section(null, new Gio.Menu()
